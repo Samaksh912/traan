@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "672975519643",
+    "project_id": "traan-f9e6a",
+    "storage_bucket": "traan-f9e6a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:672975519643:android:5be74c1e1a7d12b02feb3e",
+        "android_client_info": {
+          "package_name": "com.example.raksha"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "672975519643-n3677t9gcg6l533fpqjkp03v45a827ql.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDcNNnXhWbKFISzf4TNZBKXw7pMGYvqaZQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "672975519643-n3677t9gcg6l533fpqjkp03v45a827ql.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "672975519643-nm5sl4k2ugdobmr4df3l08r23klfl3qs.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.raksha"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
