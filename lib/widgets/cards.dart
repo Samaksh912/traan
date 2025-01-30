@@ -75,37 +75,6 @@ class HelpLineCards extends StatelessWidget {
   }
 }
 
-class ToolsCard extends StatelessWidget {
-  String title;
-  String imageurl;
-  ToolsCard({super.key, required this.title, required this.imageurl});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 180,
-      height: 180,
-      child: Card(
-        color: Colors.white,
-        elevation: 5,
-        //shape: RoundedRectangleBorder(borderRadius:BorderRadius.circular(40)),
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              Image.asset(
-                imageurl,
-                height: 60,
-              ),
-              SizedBox(height: 10),
-              Text(title, style: TextStyle(fontSize: 16)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class CardWithBackgroundImage extends StatelessWidget {
   final String title;

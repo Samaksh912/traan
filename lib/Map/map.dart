@@ -13,16 +13,16 @@ class MapPage extends StatefulWidget {
 
 class _MapPageState extends State<MapPage> {
   final Completer<WebViewController> _controller =
-      Completer<WebViewController>();
+  Completer<WebViewController>();
 
   @override
   Widget build(BuildContext context) {
     return WebView(
-        initialUrl: 'https://www.google.com/maps', // Set the URL of the Google Maps web page
-        javascriptMode: JavascriptMode.unrestricted,
-        onWebViewCreated: (WebViewController webViewController) {
-          _controller.complete(webViewController);
-        },
-      );
+      initialUrl: 'https://www.google.com/maps', // Set the URL of the Google Maps web page
+      javascriptMode: JavascriptMode.unrestricted,
+      onWebViewCreated: (WebViewController webViewController) {
+        _controller.complete(webViewController);
+      },
+    );
   }
 }

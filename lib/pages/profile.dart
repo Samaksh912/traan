@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:raksha/Home/home.dart';
-import 'package:raksha/pages/loginpage.dart';
+ // Import UserModel
 import 'package:raksha/services/authservice.dart';
+
+import '../models/usermodel.dart';
+import '../services/firestoreservice.dart';
+import 'loginpage.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -11,41 +14,64 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  // Placeholder data for profile
-  String name = "John Doe";
-  String email = "john.doe@example.com";
-  String contactNumber = "123-456-7890";
-  String emergencyContact = "987-654-3210";
-  String profilePic = "assets/images/avtar.png"; // Placeholder for profile picture
+  // Initial user data
+  UserModel user = UserModel(
+    name: "John Doe",
+    email: "john.doe@example.com",
+    contactNumber: "123-456-7890",
+    emergencyContact1: "987-654-3210",
+    emergencyContact2: "112-233-4455",
+  );
 
-  // Controllers to handle text input for updates
+  // Controllers for the text fields
   TextEditingController nameController = TextEditingController();
   TextEditingController emailController = TextEditingController();
   TextEditingController contactController = TextEditingController();
-  TextEditingController emergencyController = TextEditingController();
+  TextEditingController emergencyController1 = TextEditingController();
+  TextEditingController emergencyController2 = TextEditingController();
 
-  final AuthService _authService = AuthService(); // Instance of AuthService
+  final FirestoreService _firestoreService = FirestoreService();
+  final AuthService _authService = AuthService();
 
   @override
   void initState() {
     super.initState();
-    // Set the initial values for the text controllers
-    nameController.text = name;
-    emailController.text = email;
-    contactController.text = contactNumber;
-    emergencyController.text = emergencyContact;
+    nameController.text = user.name;
+    emailController.text = user.email;
+    contactController.text = user.contactNumber;
+    emergencyController1.text = user.emergencyContact1;
+    emergencyController2.text = user.emergencyContact2;
+
+    // Fetch user data from Firestore if available
+    _fetchUserData();
+  }
+
+  // Fetch user data from Firestore and update the fields
+  Future<void> _fetchUserData() async {
+    final fetchedUser = await _firestoreService.getUserData();
+    if (fetchedUser != null) {
+      setState(() {
+        user = fetchedUser;
+        nameController.text = user.name;
+        emailController.text = user.email;
+        contactController.text = user.contactNumber;
+        emergencyController1.text = user.emergencyContact1;
+        emergencyController2.text = user.emergencyContact2;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.black87,
         centerTitle: true,
-        title: const Text("Profile"),
+        title: const Text("Profile",style: TextStyle(color: Colors.white) ,),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back), // Back icon
+          icon: const Icon(Icons.arrow_back,color: Colors.white,),
           onPressed: () {
-            Navigator.pop(context); // Simply pop the current screen
+            Navigator.pop(context);
           },
         ),
       ),
@@ -54,78 +80,63 @@ class _ProfilePageState extends State<ProfilePage> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // Profile picture
-              CircleAvatar(
-                radius: 60,
-                backgroundImage: AssetImage(profilePic),
-              ),
+              // Profile picture can be removed if not needed
+
               const SizedBox(height: 20),
 
-              // Name
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 10),
+              // Editable fields
+              _buildEditableField("Name", nameController),
+              _buildEditableField("Email", emailController),
 
-              // Email
-              ListTile(
-                title: const Text("Email"),
-                subtitle: Text(email),
-                trailing: const Icon(Icons.edit),
-                onTap: () {
-                  _showEditDialog("Email", emailController, (newValue) {
-                    setState(() {
-                      email = newValue;
-                    });
-                  });
-                },
-              ),
-
-              const SizedBox(height: 10),
-
-              // Contact Number
-              ListTile(
-                title: const Text("Contact Number"),
-                subtitle: Text(contactNumber),
-                trailing: const Icon(Icons.edit),
-                onTap: () {
-                  _showEditDialog("Contact Number", contactController, (newValue) {
-                    setState(() {
-                      contactNumber = newValue;
-                    });
-                  });
-                },
-              ),
-
-              const SizedBox(height: 10),
-
-              // Emergency Contact Number
-              ListTile(
-                title: const Text("Emergency Contact"),
-                subtitle: Text(emergencyContact),
-                trailing: const Icon(Icons.edit),
-                onTap: () {
-                  _showEditDialog("Emergency Contact", emergencyController, (newValue) {
-                    setState(() {
-                      emergencyContact = newValue;
-                    });
-                  });
-                },
-              ),
+              _buildEditableField("Emergency Contact 1 (for sos)", emergencyController1),
+              _buildEditableField("Emergency Contact 2 (for emergency number)", emergencyController2),
 
               const SizedBox(height: 30),
 
-              // Logout Button
               ElevatedButton(
                 onPressed: () async {
-                  await _logout(); // Call the logout function
+                  // Save the updated user data
+                  final updatedUser = UserModel(
+                    name: nameController.text,
+                    email: emailController.text,
+                    contactNumber: contactController.text,
+                    emergencyContact1: emergencyController1.text,
+                    emergencyContact2: emergencyController2.text,
+                  );
+                  await _firestoreService.saveUserData(updatedUser);
+                  // Show a SnackBar after saving
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Profile changes saved successfully!'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+
+
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.redAccent,
+                  backgroundColor: Colors.black54,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+                ),
+                child: const Text(
+                  "Save Changes",
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 15,),
+              ElevatedButton(
+                onPressed: () async {
+                  await _logout();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade600,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -146,8 +157,19 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // Function to show an edit dialog for changing values
-  void _showEditDialog(String field, TextEditingController controller, Function(String) onSave) {
+  // Function to create editable fields for the profile
+  Widget _buildEditableField(String fieldName, TextEditingController controller) {
+    return ListTile(
+      title: Text(fieldName),
+      subtitle: Text(controller.text),
+      trailing: const Icon(Icons.edit),
+      onTap: () {
+        _showEditDialog(fieldName, controller);
+      },
+    );
+  }
+
+  void _showEditDialog(String field, TextEditingController controller) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -162,14 +184,27 @@ class _ProfilePageState extends State<ProfilePage> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context); // Close the dialog
+                Navigator.pop(context);
               },
               child: const Text("Cancel"),
             ),
             TextButton(
               onPressed: () {
-                onSave(controller.text); // Save the new value
-                Navigator.pop(context); // Close the dialog
+                setState(() {
+                  // Update the user data with the new value
+                  if (field == "Name") {
+                    user.name = controller.text;
+                  } else if (field == "Email") {
+                    user.email = controller.text;
+                  } else if (field == "Contact Number") {
+                    user.contactNumber = controller.text;
+                  } else if (field == "Emergency Contact 1") {
+                    user.emergencyContact1 = controller.text;
+                  } else if (field == "Emergency Contact 2") {
+                    user.emergencyContact2 = controller.text;
+                  }
+                });
+                Navigator.pop(context);
               },
               child: const Text("Save"),
             ),
@@ -179,18 +214,12 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // Logout function
   Future<void> _logout() async {
     try {
-      await _authService.signOut(); // Call the AuthService signOut function
-
-      // Clear any local state or session data, if any
-      // Example: SharedPreferences, localStorage, etc.
-
-      // Navigate to the LoginPage after sign out
+      await _authService.signOut();
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) =>  LoginPage()), // Ensure LoginPage is correctly initialized
+        MaterialPageRoute(builder: (context) => LoginPage()),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -200,5 +229,4 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     }
   }
-
 }

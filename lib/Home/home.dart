@@ -1,5 +1,5 @@
-import 'package:path_provider/path_provider.dart';
-import 'package:boxicons/boxicons.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_phone_direct_caller/flutter_phone_direct_caller.dart';
 import 'package:raksha/models/sos.dart';
@@ -7,11 +7,52 @@ import 'package:raksha/pages/profile.dart';
 import 'package:raksha/utils/colors.dart';
 import 'package:raksha/widgets/cards.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  String name = "Loading...";
+  String emergencyContact2 = "";
+
+  @override
+  void initState() {
+    super.initState();
+    _getUserName();
+  }
+
+  // Function to fetch the user's name from Firestore
+  Future<void> _getUserName() async {
+    User? user = FirebaseAuth.instance.currentUser; // Get the current logged-in user
+
+    if (user != null) {
+      var userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+
+      if (userDoc.exists) {
+        setState(() {
+          name = userDoc['name'];
+          emergencyContact2 = userDoc['emergencyContact2'];// Assuming 'name' is a field in the Firestore document
+        });
+      } else {
+        setState(() {
+          name = "User not found";
+          emergencyContact2 = ""; // Handle the case where the document does not exist
+        });
+      }
+    } else {
+      setState(() {
+        name = "User not logged in";
+        emergencyContact2 = ""; // Handle the case where the user is not logged in
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+
     return SafeArea(
         child: Scaffold(
           body: Padding(
@@ -39,10 +80,10 @@ class HomePage extends StatelessWidget {
                           ),
                           Column(
                             children: [
-                              Text("Hello, Madhura",
+                              Text("Hello, $name",
                                   style: TextStyle(
                                     color: Color(ColorsValue().h5),
-                                    fontSize: 14,
+                                    fontSize: 20,
                                   )),
                               const SizedBox(
                                 height: 5,
@@ -59,32 +100,8 @@ class HomePage extends StatelessWidget {
                               const SizedBox(
                                 width: 10,
                               ),
-                              Column(
-                                children: [
-                                  Text("Alan zone...",
-                                      style: TextStyle(
-                                        color: Color(ColorsValue().h5),
-                                        fontSize: 14,
-                                      )),
-                                  const SizedBox(
-                                    height: 5,
-                                  ),
-                                  Text("Safe Location",
-                                      style: TextStyle(
-                                        color: Color(ColorsValue().secondary),
-                                        fontSize: 14,
-                                      )),
-                                ],
-                              ),
-                              const SizedBox(
-                                width: 10,
-                              ),
-                              Icon(
-                                Boxicons.bxs_map,
-                                color: Color(ColorsValue().secondary),
-                              )
-                            ],
-                          ),
+
+                         ] ),
                         ],
                       )
                     ],
@@ -109,17 +126,7 @@ class HomePage extends StatelessWidget {
                       child: InkWell(
                         splashColor: Colors.black54, // Add a splash effect if needed
                         onTap: () async {
-                          var externalStorageDirectories = await getExternalStorageDirectories();
-
-                          if (externalStorageDirectories != null && externalStorageDirectories.isNotEmpty) {
-                            String filePath = externalStorageDirectories[0].path + "/digambar.jpeg";
-                            print(filePath);
-
-                            SOS().sharePhotoToWhatsApp("7058384971", "http://file://$filePath");
-                            print("file://$filePath");
-                          } else {
-                            print("External storage directory not found.");
-                          }
+                          SOS().sendSOSMessage("7058384971"); // Call the function to send an SOS SMS
                         },
                         child: Ink.image(
                           image: const AssetImage('assets/images/sos.png'),
@@ -134,6 +141,9 @@ class HomePage extends StatelessWidget {
                   const SizedBox(
                     height: 20,
                   ),
+
+
+
                   Text(
                     "Press the button to send SOS",
                     style: TextStyle(
@@ -142,14 +152,14 @@ class HomePage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(
-                    height: 30,
+                    height: 50,
                   ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       InkWell(
                           onTap: () {
-                            _callNumber("7058384971");
+                            _callNumber("123456789");
                           },
                           child: HelpLineCards(
                             title: "Police 100",
@@ -158,12 +168,12 @@ class HomePage extends StatelessWidget {
                           )),
                       InkWell(
                           onTap: () {
-                            _callNumber("9307227317");
+                            _callNumber(emergencyContact2);
                           },
                           child: HelpLineCards(
-                            title: "Women Helpline",
+                            title: "emergency contact",
                             assetImg: "assets/images/contact.png",
-                            number: "100",
+                            number:  emergencyContact2.isEmpty ? "Loading..." : emergencyContact2, // Display number if available,
                           ))
                     ],
                   )

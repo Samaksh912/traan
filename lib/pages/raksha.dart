@@ -1,11 +1,13 @@
 import 'package:boxicons/boxicons.dart';
 import 'package:flutter/material.dart';
 import 'package:raksha/Home/home.dart';
+import 'package:raksha/pages/MapPage.dart' as map;
+import 'package:raksha/pages/audiopage.dart';
 import 'package:raksha/tools/tools.dart';
 import 'package:raksha/utils/colors.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import '../Map/map.dart';
-import '../community/community.dart';
+
 
 class Raksha extends StatefulWidget {
   @override
@@ -13,15 +15,15 @@ class Raksha extends StatefulWidget {
 }
 
 class _RakshaState extends State<Raksha> {
-  List pages = [
+  List<Widget> pages = [
     const HomePage(),
-    const MapPage(),
-    const Text("Bot"),
+     const MapPage(),
+    const AudioGuidePage(),
     const ToolsPage(),
-    const CommunityPage(),
+
   ];
 
-  var _currentIndex = 0;
+  int _currentIndex = 0; // Using int instead of var for consistency
 
   @override
   Widget build(BuildContext context) {
@@ -50,10 +52,7 @@ class _RakshaState extends State<Raksha> {
               Boxicons.bx_shield,
               color: _currentIndex == 3 ? Color(ColorsValue().secondary) : Colors.grey,
             ),
-            Icon(
-              Boxicons.bx_group,
-              color: _currentIndex == 4 ? Color(ColorsValue().secondary) : Colors.grey,
-            ),
+
           ],
           onTap: (index) {
             setState(() {

@@ -1,7 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../pages/defensetools.dart';
+import '../pages/emergencynumbers.dart';
 import '../pages/newsmodel.dart';
+import '../pages/safetytips.dart';
+import '../pages/selfdefense.dart';
 import '../widgets/cards.dart';
+import '../widgets/toolscard.dart';
 import 'fetchnews.dart';
 
 class ToolsPage extends StatefulWidget {
@@ -144,19 +149,19 @@ class _ToolsPageState extends State<ToolsPage> {
                 children: [
                   Padding(
                     padding: const EdgeInsets.all(8.0),
-                    child: ToolsCard(imageurl: 'assets/images/tips.png', title: "Safety Tips"),
+                    child: ToolsCard(title: "Safety Tips", imageUrl: "assets/images/tips.png", page: SafetyTipsPage()),
                   ),
                   Padding(
                     padding: const EdgeInsets.all(8.0),
-                    child: ToolsCard(imageurl: 'assets/images/tool.png', title: "Defense Tools"),
+                    child: ToolsCard(title: "Defense Tools", imageUrl: "assets/images/tool.png", page: DefenseToolsPage()),
                   ),
                   Padding(
                     padding: const EdgeInsets.all(8.0),
-                    child: ToolsCard(imageurl: 'assets/images/self1.png', title: "Self Defense"),
+                    child:ToolsCard(title: "Self Defense", imageUrl: "assets/images/self1.png", page: SelfDefensePage()),
                   ),
                   Padding(
                     padding: const EdgeInsets.all(8.0),
-                    child: ToolsCard(imageurl: 'assets/images/alert.png', title: "Emergency"),
+                    child: ToolsCard(title: "Emergency", imageUrl: "assets/images/alert.png", page: EmergencyContactsPage()),
                   ),
                 ],
               ),

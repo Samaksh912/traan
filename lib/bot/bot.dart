@@ -1,94 +1,154 @@
-import 'package:dialog_flowtter/dialog_flowtter.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:audioplayers/audioplayers.dart';
 
-import 'messages.dart';
 
-class BotPage extends StatefulWidget {
+
+class FakeCallScreen extends StatefulWidget {
   @override
-  _BotPageState createState() => _BotPageState();
+  _FakeCallScreenState createState() => _FakeCallScreenState();
 }
 
-class _BotPageState extends State<BotPage> {
-  late DialogFlowtter dialogFlowtter;
-  final TextEditingController _controller = TextEditingController();
+class _FakeCallScreenState extends State<FakeCallScreen> {
+  bool isCalling = false;
+  AudioPlayer audioPlayer = AudioPlayer();
+  String selectedLanguage = 'English';
 
-  List<Map<String, dynamic>> messages = [];
-
-  @override
-  void initState() {
-    DialogFlowtter.fromFile().then((instance) => dialogFlowtter = instance);
-    super.initState();
+  void startFakeCall() async {
+    setState(() {
+      isCalling = true;
+    });
+    await Future.delayed(Duration(seconds: 3)); // Simulate call delay
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => IncomingCallScreen(audioPlayer, selectedLanguage)),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Bot',
-          style: GoogleFonts.dancingScript(
-              fontWeight: FontWeight.w900, fontSize: 28, color: Colors.white),
-        ),
-      ),
-      body: Container(
+      appBar: AppBar(title: Text('Traan – Women Safety')),
+      body: Center(
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Expanded(child: MessagesScreen(messages: messages)),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              color: Color.fromARGB(255, 31, 17, 55),
-              child: Row(
-                children: [
-                  Expanded(
-                      child: TextField(
-                    decoration: InputDecoration(
-                        hintText: "ask question",
-                        hintStyle: TextStyle(color: Colors.white),
-                        focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Colors.white),
-                        ),
-                        enabledBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: Colors.white))),
-                    controller: _controller,
-                    style: TextStyle(color: Colors.white),
-                  )),
-                  IconButton(
-                      onPressed: () {
-                        sendMessage(_controller.text);
-                        _controller.clear();
-                      },
-                      icon: Icon(
-                        Icons.send,
-                        color: Colors.white,
-                      ))
-                ],
-              ),
-            )
+            DropdownButton<String>(
+              value: selectedLanguage,
+              items: ['English', 'Hindi', 'Telugu', 'Tamil'].map((String language) {
+                return DropdownMenuItem<String>(
+                  value: language,
+                  child: Text(language),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                setState(() {
+                  selectedLanguage = newValue!;
+                });
+              },
+            ),
+            ElevatedButton(
+              onPressed: startFakeCall,
+              child: Text('Trigger Fake Call'),
+            ),
           ],
         ),
       ),
     );
   }
+}
 
-  sendMessage(String text) async {
-    if (text.isEmpty) {
-      print('Message is empty');
-    } else {
-      setState(() {
-        addMessage(Message(text: DialogText(text: [text])), true);
-      });
+class IncomingCallScreen extends StatelessWidget {
+  final AudioPlayer audioPlayer;
+  final String selectedLanguage;
+  IncomingCallScreen(this.audioPlayer, this.selectedLanguage);
 
-      DetectIntentResponse response = await dialogFlowtter.detectIntent(
-          queryInput: QueryInput(text: TextInput(text: text)));
-      if (response.message == null) return;
-      setState(() {
-        addMessage(response.message!);
-      });
-    }
+  void answerCall(BuildContext context) async {
+    String audioFile = selectedLanguage == 'Hindi' ? 'male_voice_hindi.mp3' :
+    selectedLanguage == 'Telugu' ? 'male_voice_telugu.mp3' :
+    selectedLanguage == 'Tamil' ? 'male_voice_tamil.mp3' :
+    'male_voice.mp3';
+
+    await audioPlayer.play(AssetSource(audioFile));
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => CallOngoingScreen(audioPlayer, selectedLanguage)),
+    );
   }
 
-  addMessage(Message message, [bool isUserMessage = false]) {
-    messages.add({'message': message, 'isUserMessage': isUserMessage});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Incoming Call...', style: TextStyle(fontSize: 24)),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () => answerCall(context),
+              child: Text('Answer'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class CallOngoingScreen extends StatelessWidget {
+  final AudioPlayer audioPlayer;
+  final String selectedLanguage;
+  CallOngoingScreen(this.audioPlayer, this.selectedLanguage);
+
+  @override
+  Widget build(BuildContext context) {
+    Map<String, Map<String, String>> dialogues = {
+      'English': {
+        'voice': '"Hey, where are you? I’m coming to pick you up!"',
+        'response': '"I’m near XYZ place, please reach in 5 minutes."'
+      },
+      'Hindi': {
+        'voice': '"अरे, तुम कहाँ हो? मैं तुम्हें लेने आ रहा हूँ!"',
+        'response': '"मैं XYZ जगह पर हूँ, कृपया 5 मिनट में पहुंचें।"'
+      },
+      'Telugu': {
+        'voice': '"హే, నువ్వు ఎక్కడ ఉన్నావు? నేను నిన్ను తీసుకురావటానికి వస్తున్నాను!"',
+        'response': '"నేను XYZ ప్రాంతంలో ఉన్నాను, దయచేసి 5 నిమిషాల్లో రా."'
+      },
+      'Tamil': {
+        'voice': '"ஹே, நீங்க எங்கே இருக்கீங்க? நான் உங்களை அழைத்துக்கொள்ள வருகிறேன்!"',
+        'response': '"நான் XYZ இடத்தில் இருக்கிறேன், 5 நிமிடங்களில் அடையுங்கள்."'
+      },
+    };
+
+    return Scaffold(
+      appBar: AppBar(title: Text('Fake Call Ongoing')),
+      body: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'Male Voice: ${dialogues[selectedLanguage]!['voice']}',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'Suggested Response: ${dialogues[selectedLanguage]!['response']}',
+              style: TextStyle(fontSize: 16, fontStyle: FontStyle.italic),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              audioPlayer.stop();
+              Navigator.popUntil(context, (route) => route.isFirst);
+            },
+            child: Text('End Call'),
+          ),
+        ],
+      ),
+    );
   }
 }

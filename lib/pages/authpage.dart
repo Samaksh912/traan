@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:raksha/Home/home.dart';
 import 'package:raksha/pages/loginpage.dart';
+import 'package:raksha/pages/raksha.dart';
 import 'package:raksha/pages/registerpage.dart';
 class AuthPage extends StatelessWidget {
   const AuthPage({super.key});
@@ -16,7 +17,7 @@ class AuthPage extends StatelessWidget {
             return CircularProgressIndicator(); // Show loading indicator if still waiting
           }
           if (snapshot.hasData) {
-            return HomePage();  // Redirect to HomePage if user is signed in
+            return Raksha();  // Redirect to HomePage if user is signed in
           } else {
             return RegisterPage();  // Show RegisterPage if user is not signed in
           }
