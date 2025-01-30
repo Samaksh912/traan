@@ -36,7 +36,7 @@ Installation
 
 Clone the repository:
 
-git clone https://github.com/yourusername/traan.git
+git clone https://github.com/Samaksh912/traan.git
 
 Navigate to the project directory:
 
