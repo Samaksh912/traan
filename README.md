@@ -1,72 +1,69 @@
-# Raksha: Women Safety App
+Traan - Women's Safety App
 
-![Raksha Logo](https://github.com/digambar2002/raksha/blob/master/assets/images/raksha.png)
+Overview
 
-Raksha is a dedicated women safety app developed using Flutter, designed to empower women and provide them with tools to enhance their safety and security. With its intuitive interface and powerful features, Raksha aims to create a safer environment for women everywhere.
+~Traan is a women's safety app designed to help users navigate safely by suggesting the most secure travel paths based on past crime records. The app integrates Machine Learning with Association Rule Mining and Market Basket Analysis to provide crime rate analysis and safe route recommendations. Developed with Flutter, it ensures a seamless user experience while offering critical safety features.
 
-## Features
+Features
 
-- **Emergency Alerts:** Instantly send distress signals to pre-selected emergency contacts with your current location in case of danger.
+SOS Feature – Instantly call an emergency contact or send your current location to a trusted person.
 
-- **Location Tracking:** Allow your loved ones to track your real-time location during critical situations, ensuring your safety is always a priority.
+Crime Rate Analysis & Safe Route Finder – Uses API and data analysis to suggest the safest travel route based on past crime rates.
 
-- **Safe Routes:** Discover and navigate through safer routes, avoiding potentially unsafe areas based on real-time data and user reviews.
+Links for Defense Tools & Safety Tips – Provides resources and guidance for self-defense.
 
-- **Quick Access:** Access emergency services like police, medical assistance, and helplines directly from the app.
+Fake Call – Plays an automatic audio (man or woman) with subtitles and suggested responses for the user.
 
-- **Audio Recording:** Record audio evidence discreetly, which can be used later for legal purposes.
+Fake Siren – Triggers a loud siren in emergency situations.
 
-- **Stay Informed:** Receive regular updates on safety tips, legal rights, and self-defense techniques to stay informed and prepared.
+Tech Stack
 
-## Getting Started
+Frontend: Flutter
 
-1. Clone this repository to your local machine.
-   ```
-   git clone https://github.com/yourusername/raksha-app.git
-   ```
+Backend: Firebase / Node.js
 
-2. Navigate to the project directory.
-   ```
-   cd raksha-app
-   ```
+Database: Firestore
 
-3. Install the required dependencies.
-   ```
-   flutter pub get
-   ```
+Machine Learning: Python (Pandas, Scikit-learn)
 
-4. Connect your device or emulator.
+APIs: MapMyIndia API, Crime Data API, Firebase API
 
-5. Run the app.
-   ```
-   flutter run
-   ```
+Dataset
 
-6. Explore Raksha and its features to better understand its functionality.
+The app utilizes crime datasets from 2012-2015 for various Indian cities. These datasets have been merged for data analysis and route safety calculations.
 
-## Contributing
+Installation
 
-We welcome contributions from the community to make Raksha even more effective and user-friendly. To contribute:
+Clone the repository:
 
-1. Fork the repository.
-2. Create a new branch.
-3. Implement your changes or features.
-4. Submit a pull request.
+git clone https://github.com/yourusername/traan.git
 
-For more detailed information, please review our [Contribution Guidelines](CONTRIBUTING.md).
+Navigate to the project directory:
 
-## Feedback and Support
+cd traan
 
-If you have any feedback, suggestions, or encounter issues while using Raksha, please [open an issue](https://github.com/yourusername/raksha-app/issues). We are committed to improving the app's usability and reliability.
+Install dependencies:
 
-## Privacy and Security
+flutter pub get
 
-We take user privacy and data security seriously. Raksha implements strict security measures to protect user information and ensure a safe experience. For more information, please refer to our [Privacy Policy](PRIVACY.md).
+Run the app:
 
-## License
+flutter run
 
-Raksha is open-source software licensed under the [MIT License](LICENSE). Feel free to use, modify, and distribute the app to contribute to the safety and empowerment of women around the world.
+Future Enhancements
 
----
+Real-time crime data integration
 
-Empower yourself and promote safety with Raksha. Download the app and take control of your security. Together, let's build a safer world for women. 💪🚀
+AI-powered voice assistant for safety guidance
+
+Advanced predictive analytics for crime trends
+
+Community reporting feature
+
+Contributors
+
+Samaksh Goel
+S Shreya
+Vaishnavi Amancharla
+Yuvika Gandhi
+Aditi S
