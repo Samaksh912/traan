@@ -25,14 +25,14 @@ class _RakshaState extends State<Raksha> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        body: pages[_currentIndex], // Switch pages based on currentIndex
+    return Scaffold(
+        extendBody: true,
+        body: pages[_currentIndex],
         bottomNavigationBar: CurvedNavigationBar(
           color: Colors.black87,
-          index: _currentIndex, // Correct property to set the selected index
+          index: _currentIndex,
           backgroundColor: Color(ColorsValue().primary),
-          height: 60, // Add height if necessary
+          height: 60,
           items: [
             Icon(
               Boxicons.bx_home,
@@ -61,7 +61,17 @@ class _RakshaState extends State<Raksha> {
             });
           },
         ),
-      ),
+        // Add floating button only on Map page
+        floatingActionButton: _currentIndex == 1
+            ? FloatingActionButton(
+          onPressed: () {
+            // Center map to India
+          },
+          child: Icon(Icons.my_location),
+          backgroundColor: Colors.blue,
+        )
+            : null,
+
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'package:geolocator/geolocator.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:boxicons/boxicons.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:raksha/models/sos.dart';
 import 'package:raksha/pages/profile.dart';
 import 'package:raksha/utils/colors.dart';
 import 'package:raksha/widgets/cards.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -39,10 +41,11 @@ class HomePage extends StatelessWidget {
                           ),
                           Column(
                             children: [
-                              Text("Hello, Madhura",
+                              Text("Home",
                                   style: TextStyle(
                                     color: Color(ColorsValue().h5),
-                                    fontSize: 14,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w500,
                                   )),
                               const SizedBox(
                                 height: 5,
@@ -52,41 +55,6 @@ class HomePage extends StatelessWidget {
                           )
                         ],
                       ),
-                      Row(
-                        children: [
-                          Row(
-                            children: [
-                              const SizedBox(
-                                width: 10,
-                              ),
-                              Column(
-                                children: [
-                                  Text("Alan zone...",
-                                      style: TextStyle(
-                                        color: Color(ColorsValue().h5),
-                                        fontSize: 14,
-                                      )),
-                                  const SizedBox(
-                                    height: 5,
-                                  ),
-                                  Text("Safe Location",
-                                      style: TextStyle(
-                                        color: Color(ColorsValue().secondary),
-                                        fontSize: 14,
-                                      )),
-                                ],
-                              ),
-                              const SizedBox(
-                                width: 10,
-                              ),
-                              Icon(
-                                Boxicons.bxs_map,
-                                color: Color(ColorsValue().secondary),
-                              )
-                            ],
-                          ),
-                        ],
-                      )
                     ],
                   ),
                   const SizedBox(
@@ -109,16 +77,49 @@ class HomePage extends StatelessWidget {
                       child: InkWell(
                         splashColor: Colors.black54, // Add a splash effect if needed
                         onTap: () async {
-                          var externalStorageDirectories = await getExternalStorageDirectories();
+                          try {
+                            // Check if location services are enabled
+                            bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+                            if (!serviceEnabled) {
+                              print("Location services are disabled");
+                              return;
+                            }
 
-                          if (externalStorageDirectories != null && externalStorageDirectories.isNotEmpty) {
-                            String filePath = externalStorageDirectories[0].path + "/digambar.jpeg";
-                            print(filePath);
+                            // Request location permission
+                            LocationPermission permission = await Geolocator.checkPermission();
+                            if (permission == LocationPermission.denied) {
+                              permission = await Geolocator.requestPermission();
+                              if (permission == LocationPermission.denied) {
+                                print("Location permissions denied");
+                                return;
+                              }
+                            }
 
-                            SOS().sharePhotoToWhatsApp("7058384971", "http://file://$filePath");
-                            print("file://$filePath");
-                          } else {
-                            print("External storage directory not found.");
+                            if (permission == LocationPermission.deniedForever) {
+                              print("Location permissions permanently denied");
+                              return;
+                            }
+
+                            // Get current location
+                            Position position = await Geolocator.getCurrentPosition(
+                              desiredAccuracy: LocationAccuracy.high,
+                            );
+
+                            // Create Google Maps link
+                            String locationUrl = "https://maps.google.com/?q=${position.latitude},${position.longitude}";
+
+                            // Create message
+                            String message = "Emergency! My current location: $locationUrl";
+
+                            // Share to WhatsApp using wa.me link
+                            String phoneNumber = "919627320508"; // Add country code (91 for India)
+                            String whatsappUrl = "https://wa.me/$phoneNumber?text=${Uri.encodeComponent(message)}";
+
+                            final Uri uri = Uri.parse(whatsappUrl);
+                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+                          } catch (e) {
+                            print("Error sharing location: $e");
                           }
                         },
                         child: Ink.image(

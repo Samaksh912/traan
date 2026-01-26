@@ -26,7 +26,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Flutter Demo',
       debugShowCheckedModeBanner: false,
-      home: AuthPage(), // Set Raksha() as the home widget
+      home: Raksha(), // Set Raksha() as the home widget
       theme: ThemeData(
         scaffoldBackgroundColor: Color(ColorsValue().primary),
         appBarTheme: const AppBarTheme(
