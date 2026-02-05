@@ -16,9 +16,7 @@ class _RakshaState extends State<Raksha> {
   List pages = [
     const HomePage(),
     const MapPage(),
-    const Text("Bot"),
     const ToolsPage(),
-    const CommunityPage(),
   ];
 
   var _currentIndex = 0;
@@ -43,16 +41,8 @@ class _RakshaState extends State<Raksha> {
               color: _currentIndex == 1 ? Color(ColorsValue().secondary) : Colors.grey,
             ),
             Icon(
-              Boxicons.bx_bot,
-              color: _currentIndex == 2 ? Color(ColorsValue().secondary) : Colors.grey,
-            ),
-            Icon(
               Boxicons.bx_shield,
-              color: _currentIndex == 3 ? Color(ColorsValue().secondary) : Colors.grey,
-            ),
-            Icon(
-              Boxicons.bx_group,
-              color: _currentIndex == 4 ? Color(ColorsValue().secondary) : Colors.grey,
+              color: _currentIndex == 2 ? Color(ColorsValue().secondary) : Colors.grey,
             ),
           ],
           onTap: (index) {
@@ -61,16 +51,7 @@ class _RakshaState extends State<Raksha> {
             });
           },
         ),
-        // Add floating button only on Map page
-        floatingActionButton: _currentIndex == 1
-            ? FloatingActionButton(
-          onPressed: () {
-            // Center map to India
-          },
-          child: Icon(Icons.my_location),
-          backgroundColor: Colors.blue,
-        )
-            : null,
+
 
     );
   }

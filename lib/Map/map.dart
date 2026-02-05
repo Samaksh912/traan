@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:csv/csv.dart';
+import 'package:geolocator/geolocator.dart'; // REQUIRED: Add geolocator to pubspec.yaml
 import 'dart:math' as math;
 
 // Data Model
@@ -27,20 +28,20 @@ class SafetyZone {
     required this.boundary,
   });
 
-  Color get fillColor {
+  Color get baseColor {
     String category = safetyCategory.toLowerCase();
-    if (category == 'safe') return Colors.green.withOpacity(0.5);
-    if (category == 'moderate') return Colors.orange.withOpacity(0.5);
-    if (category == 'unsafe') return Colors.red.withOpacity(0.5);
-    return Colors.grey.withOpacity(0.4);
+    if (category == 'safe') return Colors.green;
+    if (category == 'moderate') return Colors.orange;
+    if (category == 'unsafe') return Colors.red;
+    return Colors.grey;
   }
 
   Color get borderColor {
     String category = safetyCategory.toLowerCase();
-    if (category == 'safe') return Colors.green.shade800;
-    if (category == 'moderate') return Colors.orange.shade900;
+    if (category == 'safe') return Colors.green.shade900;
+    if (category == 'moderate') return Colors.deepOrange.shade900;
     if (category == 'unsafe') return Colors.red.shade900;
-    return Colors.grey.shade800;
+    return Colors.grey.shade900;
   }
 }
 
@@ -53,12 +54,17 @@ class MapPage extends StatefulWidget {
 
 class _MapPageState extends State<MapPage> {
   final MapController _mapController = MapController();
+  final TextEditingController _searchController = TextEditingController();
+
   List<SafetyZone> _allZones = [];
   List<SafetyZone> _visibleZones = [];
   bool _isLoading = true;
+  bool _isLocating = false; // Loading state for GPS
   Set<String> _selectedCategories = {'Safe', 'Moderate', 'Unsafe'};
 
-  // Cache for State Centers to avoid re-parsing constantly
+  // Track if we are in "Focused" mode
+  bool get _isFocusedMode => _visibleZones.length == 1;
+
   final Map<String, LatLng> _stateCenters = GeoData.stateCoordinates;
 
   @override
@@ -67,88 +73,52 @@ class _MapPageState extends State<MapPage> {
     _loadSafetyData();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadSafetyData() async {
     try {
-      print('Starting to load CSV data...');
       final rawData = await rootBundle.loadString('assets/final_safety_scores.csv');
-      print('CSV file loaded, size: ${rawData.length} characters');
 
-      // Parse CSV with explicit settings to handle different line endings
       List<List<dynamic>> csvData = const CsvToListConverter(
         eol: '\n',
         shouldParseNumbers: false,
       ).convert(rawData);
 
-      print('CSV parsed, total rows: ${csvData.length}');
-
-      // If still only 1 row, try splitting manually by newlines
+      // Handle generic newline issues
       if (csvData.length == 1) {
-        print('Only 1 row detected, trying manual line splitting...');
-
-        // Try different line ending patterns
         List<String> lines = rawData.split('\n');
-        if (lines.length <= 1) {
-          lines = rawData.split('\r\n');
-        }
-        if (lines.length <= 1) {
-          lines = rawData.split('\r');
-        }
+        if (lines.length <= 1) lines = rawData.split('\r\n');
+        if (lines.length <= 1) lines = rawData.split('\r');
 
-        print('Found ${lines.length} lines after manual split');
-
-        // Re-parse each line
         csvData = [];
         for (var line in lines) {
           if (line.trim().isEmpty) continue;
           var row = const CsvToListConverter(shouldParseNumbers: false).convert(line);
-          if (row.isNotEmpty) {
-            csvData.add(row[0]);
-          }
+          if (row.isNotEmpty) csvData.add(row[0]);
         }
-
-        print('After re-parsing: ${csvData.length} rows');
       }
 
       if (csvData.isEmpty || csvData.length <= 1) {
-        print('ERROR: CSV data is empty or has only headers!');
         setState(() => _isLoading = false);
         return;
       }
 
-      // Print first row (headers)
-      print('CSV Headers (first 5): ${csvData[0].take(5).toList()}');
-
-      // Print a sample data row
-      if (csvData.length > 1) {
-        print('Sample row (first 5 cols): ${csvData[1].take(5).toList()}');
-        print('Row length: ${csvData[1].length}');
-      }
-
-      // Map to store only the LATEST year data for each district (Key: "STATE_DISTRICT")
       Map<String, List<dynamic>> latestDistrictData = {};
 
-      // 1. Filter for latest year
       for (int i = 1; i < csvData.length; i++) {
         var row = csvData[i];
-
-        // Check minimum required columns
-        if (row.length < 13) {
-          print('Skipping row $i: insufficient columns (${row.length})');
-          continue;
-        }
+        if (row.length < 13) continue;
 
         String state = _normalizeName(row[0]);
         String district = _normalizeName(row[1]);
 
-        // Skip aggregates
-        if (district.contains('TOTAL') || district == 'ZZ') {
-          print('Skipping aggregate: $district');
-          continue;
-        }
+        if (district.contains('TOTAL') || district == 'ZZ') continue;
 
-        // Normalize Year
         int year = int.tryParse(row[2].toString().split('.')[0]) ?? 0;
-
         String key = "${state}_$district";
 
         if (!latestDistrictData.containsKey(key) ||
@@ -157,35 +127,20 @@ class _MapPageState extends State<MapPage> {
         }
       }
 
-      print('Filtered to ${latestDistrictData.length} unique districts');
-
-      // 2. Create SafetyZone objects
       List<SafetyZone> zones = [];
-      int processedCount = 0;
-      int skippedCount = 0;
-
       latestDistrictData.forEach((key, row) {
         String state = _normalizeName(row[0]);
         String district = _normalizeName(row[1]);
 
-        // Skip railway and special administrative units
-        if (district.contains('RLY') || district.contains('RAILWAY')) {
-          skippedCount++;
-          return;
-        }
+        if (district.contains('RLY') || district.contains('RAILWAY')) return;
 
-        // Logic: Try exact match -> Try fuzzy match -> Fallback to State Center + Offset
         LatLng center = _getBestCoordinates(state, district);
 
-        // Normalize safety category
         String safetyCategory = row[12].toString().trim();
-        // Capitalize first letter only
         if (safetyCategory.isNotEmpty) {
           safetyCategory = safetyCategory[0].toUpperCase() +
               safetyCategory.substring(1).toLowerCase();
         }
-
-        print('Processing: $district, $state -> Category: $safetyCategory, Center: ${center.latitude}, ${center.longitude}');
 
         zones.add(SafetyZone(
           name: district,
@@ -195,57 +150,22 @@ class _MapPageState extends State<MapPage> {
           safetyScore: double.tryParse(row[11].toString()) ?? 0,
           safetyCategory: safetyCategory,
           center: center,
-          // INCREASED RADIUS: 0.3 degrees (~33km) instead of 0.11
           boundary: _generateCircularBoundary(center, 0.3),
         ));
-
-        processedCount++;
-
-        // Only print first 5 to avoid spam
-        if (processedCount <= 5) {
-          print('Added zone: $district ($safetyCategory)');
-        }
       });
-
-      print('Processed: $processedCount zones, Skipped: $skippedCount');
-      print('Total zones created: ${zones.length}');
 
       setState(() {
         _allZones = zones;
-        _updateVisibleZones();
+        _resetView();
         _isLoading = false;
       });
 
-      print('Loaded ${zones.length} safety zones');
-      print('Safe: ${zones.where((z) => z.safetyCategory.toLowerCase() == 'safe').length}');
-      print('Moderate: ${zones.where((z) => z.safetyCategory.toLowerCase() == 'moderate').length}');
-      print('Unsafe: ${zones.where((z) => z.safetyCategory.toLowerCase() == 'unsafe').length}');
-
-    } catch (e, stackTrace) {
-      print('ERROR loading data: $e');
-      print('Stack trace: $stackTrace');
+    } catch (e) {
+      print('Error: $e');
       setState(() => _isLoading = false);
-
-      // Show error dialog to user
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text('Error Loading Data'),
-            content: Text('Failed to load safety data: $e\n\nPlease check that final_safety_scores.csv is in the assets folder and pubspec.yaml is configured correctly.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('OK'),
-              ),
-            ],
-          ),
-        );
-      }
     }
   }
 
-  // Helper to standardise names for lookup
   String _normalizeName(dynamic input) {
     if (input == null) return "";
     return input.toString().toUpperCase().trim()
@@ -255,38 +175,26 @@ class _MapPageState extends State<MapPage> {
   }
 
   LatLng _getBestCoordinates(String state, String district) {
-    // 1. Check Exact District Match
     if (GeoData.districtCoordinates.containsKey(district)) {
       return GeoData.districtCoordinates[district]!;
     }
-
-    // 2. Check Partial District Match (e.g. "HYDERABAD CITY" -> "HYDERABAD")
     for (var key in GeoData.districtCoordinates.keys) {
       if (district.contains(key) || key.contains(district)) {
         return GeoData.districtCoordinates[key]!;
       }
     }
-
-    // 3. Fallback: Use State Center + Deterministic Random Offset
-    // This ensures all districts in a state appear clustered but not overlapping
     if (_stateCenters.containsKey(state)) {
       LatLng stateCenter = _stateCenters[state]!;
-
-      // Use hashcode to generate a consistent "random" offset for this district
       int hash = district.hashCode;
-      double latOffset = ((hash % 100) - 50) / 100.0; // +/- 0.5 degrees (INCREASED)
+      double latOffset = ((hash % 100) - 50) / 100.0;
       double lngOffset = (((hash >> 4) % 100) - 50) / 100.0;
-
       return LatLng(stateCenter.latitude + latOffset, stateCenter.longitude + lngOffset);
     }
-
-    // 4. Absolute Fallback (Center of India)
     return LatLng(20.5937, 78.9629);
   }
 
   List<LatLng> _generateCircularBoundary(LatLng center, double radiusDegrees) {
     List<LatLng> points = [];
-    // Increased to 24 points for smoother circles
     const int numberOfPoints = 24;
     for (int i = 0; i < numberOfPoints; i++) {
       double angle = (i * 360 / numberOfPoints) * math.pi / 180;
@@ -297,25 +205,145 @@ class _MapPageState extends State<MapPage> {
     return points;
   }
 
-  void _updateVisibleZones() {
+  // --- LOCATION SERVICES ---
+
+  Future<void> _handleFindNearestDistrict() async {
+    setState(() => _isLocating = true);
+
+    try {
+      // 1. Check Service Status
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw 'Location services are disabled.';
+      }
+
+      // 2. Check Permissions
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw 'Location permissions are denied';
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        throw 'Location permissions are permanently denied, we cannot request permissions.';
+      }
+
+      // 3. Get Position
+      Position position = await Geolocator.getCurrentPosition();
+      LatLng userLocation = LatLng(position.latitude, position.longitude);
+
+      // 4. Find Nearest Zone
+      SafetyZone? nearestZone;
+      double minDistance = double.infinity;
+      const Distance distanceCalculator = Distance();
+
+      for (var zone in _allZones) {
+        double dist = distanceCalculator.as(
+          LengthUnit.Meter,
+          userLocation,
+          zone.center,
+        );
+
+        if (dist < minDistance) {
+          minDistance = dist;
+          nearestZone = zone;
+        }
+      }
+
+      // 5. Highlight Nearest
+      if (nearestZone != null) {
+        // Isolate logic
+        _isolateZone(nearestZone);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('You are near ${nearestZone.name} (${(minDistance/1000).toStringAsFixed(1)} km away)'),
+            backgroundColor: Colors.blue.shade900,
+          ),
+        );
+      }
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+      );
+    } finally {
+      setState(() => _isLocating = false);
+    }
+  }
+
+
+  // --- FOCUS & SEARCH LOGIC ---
+
+  void _resetView() {
     setState(() {
+      _searchController.clear();
       _visibleZones = _allZones
           .where((zone) => _selectedCategories.contains(zone.safetyCategory))
           .toList();
     });
-    print('Visible zones: ${_visibleZones.length}');
+  }
+
+  void _performSearch() {
+    String query = _searchController.text.trim().toUpperCase();
+    FocusScope.of(context).unfocus();
+
+    if (query.isEmpty) {
+      _resetView();
+      return;
+    }
+
+    List<SafetyZone> results = _allZones.where((zone) {
+      return zone.name.contains(query);
+    }).toList();
+
+    setState(() {
+      _visibleZones = results;
+    });
+
+    if (results.isNotEmpty) {
+      _mapController.move(results.first.center, 11.0);
+      if (results.length == 1) {
+        _showZoneDetails(results.first);
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No district found matching "$query"')),
+      );
+    }
+  }
+
+  void _isolateZone(SafetyZone zone) {
+    setState(() {
+      _searchController.text = zone.name;
+      _visibleZones = [zone]; // Isolate strictly
+      _mapController.move(zone.center, 11.0);
+    });
+    // Optional delay to let map move before showing sheet
+    Future.delayed(Duration(milliseconds: 300), () {
+      if (mounted) _showZoneDetails(zone);
+    });
   }
 
   void _toggleCategory(String category) {
+    if (_searchController.text.isNotEmpty) {
+      _searchController.clear();
+    }
     setState(() {
       if (_selectedCategories.contains(category)) {
         _selectedCategories.remove(category);
       } else {
         _selectedCategories.add(category);
       }
-      _updateVisibleZones();
+      _visibleZones = _allZones
+          .where((zone) => _selectedCategories.contains(zone.safetyCategory))
+          .toList();
     });
   }
+
+  // --- UI BUILDERS ---
 
   void _showZoneDetails(SafetyZone zone) {
     showModalBottomSheet(
@@ -325,44 +353,58 @@ class _MapPageState extends State<MapPage> {
       builder: (context) => Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 20)],
         ),
-        padding: EdgeInsets.all(24),
+        padding: EdgeInsets.fromLTRB(24, 12, 24, 30),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Container(
+              width: 40, height: 4,
+              margin: EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+            ),
             Row(
               children: [
                 Icon(_getIconForCategory(zone.safetyCategory),
                     color: zone.borderColor, size: 32),
-                SizedBox(width: 12),
+                SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(zone.name, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                      Text('${zone.state} • Year ${zone.year}', style: TextStyle(color: Colors.grey[600])),
+                      Text(zone.state, style: TextStyle(color: Colors.grey[700], fontSize: 14)),
                     ],
                   ),
                 ),
+                Chip(
+                  label: Text(zone.safetyCategory.toUpperCase()),
+                  backgroundColor: zone.baseColor.withOpacity(0.2),
+                  labelStyle: TextStyle(color: zone.borderColor, fontWeight: FontWeight.bold),
+                )
               ],
             ),
             Divider(height: 30),
-            _buildDetailRow("Safety Status", zone.safetyCategory.toUpperCase(), zone.borderColor),
-            _buildDetailRow("Safety Score", "${zone.safetyScore.toStringAsFixed(2)} / 100", Colors.blue.shade700),
-            _buildDetailRow("Crimes Reported", "${zone.totalCrimes.toInt()}", Colors.red.shade700),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildStatBox("Safety Score", "${zone.safetyScore.toStringAsFixed(1)}/100"),
+                _buildStatBox("Total Crimes", "${zone.totalCrimes.toInt()}"),
+                _buildStatBox("Year", "${zone.year}"),
+              ],
+            ),
             SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _mapController.move(zone.center, 10);
-              },
+            ElevatedButton.icon(
+              onPressed: () => Navigator.pop(context),
+              icon: Icon(Icons.check),
+              label: Text("Done"),
               style: ElevatedButton.styleFrom(
                 backgroundColor: zone.borderColor,
-                minimumSize: Size(double.infinity, 50),
+                foregroundColor: Colors.white,
+                minimumSize: Size(double.infinity, 48),
               ),
-              child: Text("Focus Map Here", style: TextStyle(color: Colors.white)),
             )
           ],
         ),
@@ -370,22 +412,19 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(fontSize: 16, color: Colors.grey[800])),
-          Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-        ],
-      ),
+  Widget _buildStatBox(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+        Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+      ],
     );
   }
 
   IconData _getIconForCategory(String category) {
     switch (category.toLowerCase()) {
-      case 'safe': return Icons.check_circle_outline;
+      case 'safe': return Icons.shield_outlined;
       case 'moderate': return Icons.warning_amber_rounded;
       case 'unsafe': return Icons.dangerous_outlined;
       default: return Icons.help_outline;
@@ -394,12 +433,11 @@ class _MapPageState extends State<MapPage> {
 
   @override
   Widget build(BuildContext context) {
+    final padding = MediaQuery.of(context).padding;
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text('India Safety Zones Map'),
-        backgroundColor: Colors.blue.shade700,
-        foregroundColor: Colors.white,
-      ),
+      extendBodyBehindAppBar: true,
+      resizeToAvoidBottomInset: false,
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
           : Stack(
@@ -412,14 +450,15 @@ class _MapPageState extends State<MapPage> {
               minZoom: 4,
               maxZoom: 18,
               onTap: (_, point) {
-                // Simple hit test with UPDATED radius
+                FocusScope.of(context).unfocus();
+
                 for (var zone in _visibleZones) {
                   final double dist = math.sqrt(
                       math.pow(point.latitude - zone.center.latitude, 2) +
                           math.pow(point.longitude - zone.center.longitude, 2)
                   );
-                  if (dist < 0.3) { // Updated to match new radius
-                    _showZoneDetails(zone);
+                  if (dist < 0.3) {
+                    _isolateZone(zone);
                     break;
                   }
                 }
@@ -427,79 +466,160 @@ class _MapPageState extends State<MapPage> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+                urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
                 subdomains: const ['a', 'b', 'c', 'd'],
               ),
               PolygonLayer(
-                polygons: _visibleZones.map((zone) => Polygon(
-                  points: zone.boundary,
-                  color: zone.fillColor,
-                  borderColor: zone.borderColor,
-                  borderStrokeWidth: 2.0, // Increased border width
-                  isFilled: true,
-                )).toList(),
+                polygons: _visibleZones.map((zone) {
+                  final double opacity = _isFocusedMode ? 0.85 : 0.45;
+                  return Polygon(
+                    points: zone.boundary,
+                    color: zone.baseColor.withOpacity(opacity),
+                    borderColor: zone.borderColor,
+                    borderStrokeWidth: _isFocusedMode ? 3.0 : 1.5,
+                    isFilled: true,
+                  );
+                }).toList(),
               ),
             ],
           ),
 
-          // Filters
+          // TOP BAR
           Positioned(
-            top: 10,
-            left: 10, right: 10,
-            child: Card(
-              elevation: 4,
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _filterChip('Safe', Colors.green),
-                    _filterChip('Moderate', Colors.orange),
-                    _filterChip('Unsafe', Colors.red),
-                  ],
+            top: padding.top + 10,
+            left: 16,
+            right: 16,
+            child: Column(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))
+                    ],
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: "Search district...",
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      prefixIcon: Icon(Icons.search, color: Colors.grey),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                        icon: Icon(Icons.close, color: Colors.grey),
+                        onPressed: _resetView,
+                      )
+                          : null,
+                    ),
+                    onSubmitted: (_) => _performSearch(),
+                    onChanged: (val) {
+                      if (val.isEmpty) setState(() {});
+                    },
+                    textInputAction: TextInputAction.search,
+                  ),
                 ),
-              ),
+
+                SizedBox(height: 10),
+
+                if (!_isFocusedMode && _searchController.text.isEmpty)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _filterChip('Safe', Colors.green),
+                        SizedBox(width: 8),
+                        _filterChip('Moderate', Colors.orange),
+                        SizedBox(width: 8),
+                        _filterChip('Unsafe', Colors.red),
+                      ],
+                    ),
+                  ),
+              ],
             ),
           ),
 
-          // Count Indicator
-          Positioned(
-            bottom: 20, left: 20,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [BoxShadow(blurRadius: 4, color: Colors.black26)],
+          // NEW "MY LOCATION" BUTTON
+          // Positioned above the bottom panel
+          if (!_isFocusedMode)
+            Positioned(
+              bottom: padding.bottom + 100, // Above the legend
+              right: 16,
+              child: FloatingActionButton(
+                onPressed: _isLocating ? null : _handleFindNearestDistrict,
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.blue.shade900,
+                child: _isLocating
+                    ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon(Icons.my_location),
               ),
-              child: Text('${_visibleZones.length} Districts Visible',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
             ),
-          ),
 
-          // Legend
-          Positioned(
-            bottom: 60, left: 20,
-            child: Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.95),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [BoxShadow(blurRadius: 4, color: Colors.black26)],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+          // BOTTOM BAR (Legend & Stats)
+          if (!_isFocusedMode)
+            Positioned(
+              bottom: padding.bottom + 20,
+              left: 16,
+              right: 16,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('Legend', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  SizedBox(height: 6),
-                  _legendItem(Colors.green, 'Safe'),
-                  _legendItem(Colors.orange, 'Moderate'),
-                  _legendItem(Colors.red, 'Unsafe'),
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.95),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [BoxShadow(blurRadius: 8, color: Colors.black12)],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Safety Levels', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.grey[700])),
+                        SizedBox(height: 6),
+                        _legendItem(Colors.green, 'Safe'),
+                        _legendItem(Colors.orange, 'Moderate'),
+                        _legendItem(Colors.red, 'Unsafe'),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade800,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [BoxShadow(blurRadius: 8, color: Colors.blue.withOpacity(0.3))],
+                    ),
+                    child: Text(
+                      '${_visibleZones.length} Zones',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
                 ],
               ),
             ),
-          ),
+
+          // BACK TO MAP Button
+          if (_isFocusedMode)
+            Positioned(
+              bottom: padding.bottom + 20,
+              right: 16,
+              left: 16,
+              child: ElevatedButton.icon(
+                onPressed: _resetView,
+                icon: Icon(Icons.map),
+                label: Text("Show All Districts"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.blue.shade900,
+                  padding: EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 4,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -511,17 +631,9 @@ class _MapPageState extends State<MapPage> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 16,
-            height: 16,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.5),
-              border: Border.all(width: 1.5),
-              shape: BoxShape.circle,
-            ),
-          ),
+          Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
           SizedBox(width: 6),
-          Text(label, style: TextStyle(fontSize: 11)),
+          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -531,20 +643,24 @@ class _MapPageState extends State<MapPage> {
     bool isSelected = _selectedCategories.contains(label);
     return GestureDetector(
       onTap: () => _toggleCategory(label),
-      child: Chip(
-        label: Text(label, style: TextStyle(
-            color: isSelected ? Colors.white : Colors.black87,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 200),
+        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? color : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isSelected ? color : Colors.grey.shade300),
+        ),
+        child: Text(label, style: TextStyle(
+          color: isSelected ? Colors.white : Colors.grey[700],
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
         )),
-        backgroundColor: isSelected ? color : Colors.grey[200],
       ),
     );
   }
 }
 
-// ==========================================
-// STATIC GEOGRAPHICAL DATA (For Lookup)
-// ==========================================
 class GeoData {
   static final Map<String, LatLng> stateCoordinates = {
     "ANDHRA PRADESH": LatLng(15.9129, 79.7400),
@@ -585,7 +701,6 @@ class GeoData {
   };
 
   static final Map<String, LatLng> districtCoordinates = {
-    // Andhra Pradesh
     "ADILABAD": LatLng(19.6773, 78.5320),
     "ANANTAPUR": LatLng(14.6819, 77.6006),
     "CHITTOOR": LatLng(13.2172, 79.1003),
@@ -609,8 +724,6 @@ class GeoData {
     "VIZIANAGARAM": LatLng(18.1062, 83.4189),
     "WARANGAL": LatLng(17.9689, 79.5941),
     "WEST GODAVARI": LatLng(16.7107, 81.0952),
-
-    // Major Metros & Cities (Mapping key districts)
     "MUMBAI": LatLng(19.0760, 72.8777),
     "MUMBAI SUBURBAN": LatLng(19.1676, 72.8562),
     "THANE": LatLng(19.2183, 72.9781),
