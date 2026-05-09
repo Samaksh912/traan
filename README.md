@@ -1,69 +1,66 @@
-Traan - Women's Safety App
+# Traan (Raksha) - Women Safety App
 
-Overview
+Traan is a Flutter mobile application focused on personal safety features such as SOS messaging, emergency calling, safety resources, and crime-related awareness tools.
 
-~Traan is a women's safety app designed to help users navigate safely by suggesting the most secure travel paths based on past crime records. The app integrates Machine Learning with Association Rule Mining and Market Basket Analysis to provide crime rate analysis and safe route recommendations. Developed with Flutter, it ensures a seamless user experience while offering critical safety features.
+## What is implemented in this codebase
 
-Features
+- Firebase-based authentication (email/password + Google sign-in)
+- Firestore-backed user profile data (including emergency contacts)
+- SOS flow that sends location-aware SMS via device messaging app
+- One-tap emergency calling from the home screen
+- Map view (embedded web map)
+- Tools section with crime news feed and quick-access safety resources
+- Fake call experience with multilingual scripted audio/text prompts
 
-SOS Feature – Instantly call an emergency contact or send your current location to a trusted person.
+## Tech stack
 
-Crime Rate Analysis & Safe Route Finder – Uses API and data analysis to suggest the safest travel route based on past crime rates.
+- **Framework:** Flutter (Dart)
+- **Backend services:** Firebase Auth, Cloud Firestore
+- **Mobile integrations:** Telephony/SMS, geolocation, direct phone calling, permissions
+- **Other integrations:** News API, webview, Google Maps Flutter package (dependency present)
 
-Links for Defense Tools & Safety Tips – Provides resources and guidance for self-defense.
+## Project structure (high level)
 
-Fake Call – Plays an automatic audio (man or woman) with subtitles and suggested responses for the user.
+- `/home/runner/work/traan/traan/lib/main.dart` - App bootstrap + Firebase init
+- `/home/runner/work/traan/traan/lib/pages/` - Auth, profile, and main navigation screens
+- `/home/runner/work/traan/traan/lib/Home/` - Home screen (SOS + helplines)
+- `/home/runner/work/traan/traan/lib/tools/` - Tools tab + news fetch logic
+- `/home/runner/work/traan/traan/lib/Map/` - Map screen
+- `/home/runner/work/traan/traan/lib/models/` - Models + SOS service
+- `/home/runner/work/traan/traan/assets/` - App images/audio/data assets
 
-Fake Siren – Triggers a loud siren in emergency situations.
+## Prerequisites
 
-Tech Stack
+- Flutter SDK (Dart 3 compatible; project uses `sdk: >=3.0.0 <4.0.0`)
+- Android Studio / Xcode toolchains for target platform
+- Firebase project configured for Android/iOS (files already present in this repo)
 
-Frontend: Flutter
+## Setup
 
-Backend: Firebase / Node.js
-
-Database: Firestore
-
-Machine Learning: Python (Pandas, Scikit-learn)
-
-APIs: MapMyIndia API, Crime Data API, Firebase API
-
-Dataset
-
-The app utilizes crime datasets from 2012-2015 for various Indian cities. These datasets have been merged for data analysis and route safety calculations.
-
-Installation
-
-Clone the repository:
-
+```bash
 git clone https://github.com/Samaksh912/traan.git
-
-Navigate to the project directory:
-
 cd traan
-
-Install dependencies:
-
 flutter pub get
-
-Run the app:
-
 flutter run
+```
 
-Future Enhancements
+## Validation commands
 
-Real-time crime data integration
+```bash
+flutter analyze
+flutter test
+```
 
-AI-powered voice assistant for safety guidance
+## Configuration notes
 
-Advanced predictive analytics for crime trends
+- The code uses Firebase initialization via `lib/firebase_options.dart`.
+- News fetching uses an API key in `lib/tools/fetchnews.dart`; replace with your own key for production.
+- `pubspec.yaml` currently points `telephony` to a local Windows path. Update this dependency source to a valid package source/path for your environment before building.
 
-Community reporting feature
+## Contributors
 
-Contributors
-
-Samaksh Goel
-S Shreya
-Vaishnavi Amancharla
-Yuvika Gandhi
-Aditi S
+- Samaksh Goel
+- S Shreya
+- Vaishnavi Amancharla
+- Yuvika Gandhi
+- Aditi S
