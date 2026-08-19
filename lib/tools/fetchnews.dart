@@ -1,13 +1,18 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import '../pages/newsmodel.dart';
 
 class NewsService {
-  static const String _apiKey = '56ae4dd52d004239869b3b20a673c7f9';
-  static const String _baseUrl = 'https://newsapi.org/v2/top-headlines';
+  static String get _apiKey => dotenv.env['NEWS_API_KEY'] ?? '';
 
   Future<List<NewsModel>> fetchCrimeNews() async {
+    if (_apiKey.isEmpty) {
+      throw Exception(
+          'NEWS_API_KEY is missing. Add it to your .env file.');
+    }
+
     try {
       final response = await http.get(
         Uri.parse(
@@ -15,20 +20,25 @@ class NewsService {
         ),
       );
 
-
       if (response.statusCode == 200) {
-        print('Response: ${response.body}'); // Log the response
-        final Map<String, dynamic> data = jsonDecode(response.body); // Decode the response as a Map
-        final List<dynamic> articles = data['articles']; // Extract the articles list
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        final List<dynamic> articles = data['articles'] ?? [];
 
-        // Map the list of articles to a list of NewsModel objects
         return articles.map((item) => NewsModel.fromJson(item)).toList();
       } else {
-        throw Exception('Failed to load crime news');
+        throw Exception('Failed to load crime news (status ${response.statusCode})');
       }
     } catch (e) {
-      print('Error: $e'); // Log the error
-      rethrow; // Re-throw the error to be handled in the UI
+      debugPrintError('Error fetching crime news: $e');
+      rethrow;
     }
+  }
+
+  void debugPrintError(String message) {
+    assert(() {
+      // ignore: avoid_print
+      print(message);
+      return true;
+    }());
   }
 }

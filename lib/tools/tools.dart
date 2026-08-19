@@ -20,27 +20,47 @@ class _ToolsPageState extends State<ToolsPage> {
   late Future<List<NewsModel>> crimeNews;
   late PageController _pageController;
   int _currentIndex = 0;
+  int _newsCount = 0;
+  Timer? _autoScrollTimer;
 
   @override
   void initState() {
     super.initState();
-    crimeNews = NewsService().fetchCrimeNews(); // Initialize the future here
+    crimeNews = NewsService().fetchCrimeNews();
     _pageController = PageController();
 
-    // Set a timer to automatically scroll every 5 seconds
-    Timer.periodic(Duration(seconds: 5), (timer) {
-      if (_currentIndex < 4) {
-        _currentIndex++;
-      } else {
-        _currentIndex = 0; // Reset to the first news item
-      }
+    crimeNews.then((newsList) {
+      if (!mounted) return;
+      setState(() {
+        _newsCount = newsList.length;
+      });
+      _startAutoScroll();
+    }).catchError((_) {
+      // No auto-scroll if the news fetch failed; error is shown by FutureBuilder.
+    });
+  }
+
+  void _startAutoScroll() {
+    if (_newsCount <= 1) return; // nothing to scroll between
+
+    _autoScrollTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!mounted || !_pageController.hasClients) return;
+
+      _currentIndex = (_currentIndex + 1) % _newsCount;
 
       _pageController.animateToPage(
         _currentIndex,
-        duration: Duration(seconds: 1),
+        duration: const Duration(seconds: 1),
         curve: Curves.easeInOut,
       );
     });
+  }
+
+  @override
+  void dispose() {
+    _autoScrollTimer?.cancel();
+    _pageController.dispose();
+    super.dispose();
   }
 
   @override
@@ -60,6 +80,9 @@ class _ToolsPageState extends State<ToolsPage> {
                     return Center(child: Text('Error: ${snapshot.error}'));
                   } else if (snapshot.hasData) {
                     final newsList = snapshot.data!;
+                    if (newsList.isEmpty) {
+                      return const Center(child: Text('No crime-related news available.'));
+                    }
                     return SizedBox(
                       height: 300,  // Set fixed height for the swipeable area
                       child: PageView.builder(
@@ -70,7 +93,7 @@ class _ToolsPageState extends State<ToolsPage> {
                           return GestureDetector(
                             onTap: () {
                               // Action when the card is tapped (e.g., navigate to another page)
-                              print("Card tapped: ${news.title}");
+                              debugPrint("Card tapped: ${news.title}");
                             },
                             child: Card(
                               margin: const EdgeInsets.all(8),
@@ -144,7 +167,7 @@ class _ToolsPageState extends State<ToolsPage> {
               padding: const EdgeInsets.symmetric(vertical: 10.0),
               child: GridView.count(
                 shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
+                physics: const NeverScrollableScrollPhysics(),
                 crossAxisCount: 2,
                 children: [
                   Padding(
