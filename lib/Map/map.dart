@@ -81,7 +81,8 @@ class _MapPageState extends State<MapPage> {
 
   Future<void> _loadSafetyData() async {
     try {
-      final rawData = await rootBundle.loadString('assets/final_safety_scores.csv');
+      final rawData =
+          await rootBundle.loadString('assets/final_safety_scores.csv');
 
       List<List<dynamic>> csvData = const CsvToListConverter(
         eol: '\n',
@@ -97,7 +98,8 @@ class _MapPageState extends State<MapPage> {
         csvData = [];
         for (var line in lines) {
           if (line.trim().isEmpty) continue;
-          var row = const CsvToListConverter(shouldParseNumbers: false).convert(line);
+          var row =
+              const CsvToListConverter(shouldParseNumbers: false).convert(line);
           if (row.isNotEmpty) csvData.add(row[0]);
         }
       }
@@ -122,7 +124,10 @@ class _MapPageState extends State<MapPage> {
         String key = "${state}_$district";
 
         if (!latestDistrictData.containsKey(key) ||
-            year > (int.tryParse(latestDistrictData[key]![2].toString().split('.')[0]) ?? 0)) {
+            year >
+                (int.tryParse(
+                        latestDistrictData[key]![2].toString().split('.')[0]) ??
+                    0)) {
           latestDistrictData[key] = row;
         }
       }
@@ -159,7 +164,6 @@ class _MapPageState extends State<MapPage> {
         _resetView();
         _isLoading = false;
       });
-
     } catch (e) {
       print('Error: $e');
       setState(() => _isLoading = false);
@@ -168,7 +172,10 @@ class _MapPageState extends State<MapPage> {
 
   String _normalizeName(dynamic input) {
     if (input == null) return "";
-    return input.toString().toUpperCase().trim()
+    return input
+        .toString()
+        .toUpperCase()
+        .trim()
         .replaceAll(' UT', '')
         .replaceAll(' (UT)', '')
         .replaceAll('&', 'AND');
@@ -188,7 +195,8 @@ class _MapPageState extends State<MapPage> {
       int hash = district.hashCode;
       double latOffset = ((hash % 100) - 50) / 100.0;
       double lngOffset = (((hash >> 4) % 100) - 50) / 100.0;
-      return LatLng(stateCenter.latitude + latOffset, stateCenter.longitude + lngOffset);
+      return LatLng(
+          stateCenter.latitude + latOffset, stateCenter.longitude + lngOffset);
     }
     return LatLng(20.5937, 78.9629);
   }
@@ -259,12 +267,12 @@ class _MapPageState extends State<MapPage> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('You are near ${nearestZone.name} (${(minDistance/1000).toStringAsFixed(1)} km away)'),
+            content: Text(
+                'You are near ${nearestZone.name} (${(minDistance / 1000).toStringAsFixed(1)} km away)'),
             backgroundColor: Colors.blue.shade900,
           ),
         );
       }
-
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
@@ -273,7 +281,6 @@ class _MapPageState extends State<MapPage> {
       setState(() => _isLocating = false);
     }
   }
-
 
   // --- FOCUS & SEARCH LOGIC ---
 
@@ -361,9 +368,12 @@ class _MapPageState extends State<MapPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               margin: EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2)),
             ),
             Row(
               children: [
@@ -374,15 +384,20 @@ class _MapPageState extends State<MapPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(zone.name, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                      Text(zone.state, style: TextStyle(color: Colors.grey[700], fontSize: 14)),
+                      Text(zone.name,
+                          style: TextStyle(
+                              fontSize: 22, fontWeight: FontWeight.bold)),
+                      Text(zone.state,
+                          style:
+                              TextStyle(color: Colors.grey[700], fontSize: 14)),
                     ],
                   ),
                 ),
                 Chip(
                   label: Text(zone.safetyCategory.toUpperCase()),
                   backgroundColor: zone.baseColor.withOpacity(0.2),
-                  labelStyle: TextStyle(color: zone.borderColor, fontWeight: FontWeight.bold),
+                  labelStyle: TextStyle(
+                      color: zone.borderColor, fontWeight: FontWeight.bold),
                 )
               ],
             ),
@@ -390,7 +405,8 @@ class _MapPageState extends State<MapPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildStatBox("Safety Score", "${zone.safetyScore.toStringAsFixed(1)}/100"),
+                _buildStatBox("Safety Score",
+                    "${zone.safetyScore.toStringAsFixed(1)}/100"),
                 _buildStatBox("Total Crimes", "${zone.totalCrimes.toInt()}"),
                 _buildStatBox("Year", "${zone.year}"),
               ],
@@ -417,17 +433,22 @@ class _MapPageState extends State<MapPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-        Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        Text(value,
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
       ],
     );
   }
 
   IconData _getIconForCategory(String category) {
     switch (category.toLowerCase()) {
-      case 'safe': return Icons.shield_outlined;
-      case 'moderate': return Icons.warning_amber_rounded;
-      case 'unsafe': return Icons.dangerous_outlined;
-      default: return Icons.help_outline;
+      case 'safe':
+        return Icons.shield_outlined;
+      case 'moderate':
+        return Icons.warning_amber_rounded;
+      case 'unsafe':
+        return Icons.dangerous_outlined;
+      default:
+        return Icons.help_outline;
     }
   }
 
@@ -441,187 +462,209 @@ class _MapPageState extends State<MapPage> {
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
           : Stack(
-        children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              center: LatLng(20.5937, 78.9629),
-              zoom: 5,
-              minZoom: 4,
-              maxZoom: 18,
-              onTap: (_, point) {
-                FocusScope.of(context).unfocus();
-
-                for (var zone in _visibleZones) {
-                  final double dist = math.sqrt(
-                      math.pow(point.latitude - zone.center.latitude, 2) +
-                          math.pow(point.longitude - zone.center.longitude, 2)
-                  );
-                  if (dist < 0.3) {
-                    _isolateZone(zone);
-                    break;
-                  }
-                }
-              },
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
-              ),
-              PolygonLayer(
-                polygons: _visibleZones.map((zone) {
-                  final double opacity = _isFocusedMode ? 0.85 : 0.45;
-                  return Polygon(
-                    points: zone.boundary,
-                    color: zone.baseColor.withOpacity(opacity),
-                    borderColor: zone.borderColor,
-                    borderStrokeWidth: _isFocusedMode ? 3.0 : 1.5,
-                    isFilled: true,
-                  );
-                }).toList(),
-              ),
-            ],
-          ),
-
-          // TOP BAR
-          Positioned(
-            top: padding.top + 10,
-            left: 16,
-            right: 16,
-            child: Column(
               children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))
-                    ],
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: "Search district...",
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      prefixIcon: Icon(Icons.search, color: Colors.grey),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                        icon: Icon(Icons.close, color: Colors.grey),
-                        onPressed: _resetView,
-                      )
-                          : null,
-                    ),
-                    onSubmitted: (_) => _performSearch(),
-                    onChanged: (val) {
-                      if (val.isEmpty) setState(() {});
+                FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    center: LatLng(20.5937, 78.9629),
+                    zoom: 5,
+                    minZoom: 4,
+                    maxZoom: 18,
+                    onTap: (_, point) {
+                      FocusScope.of(context).unfocus();
+
+                      for (var zone in _visibleZones) {
+                        final double dist = math.sqrt(math.pow(
+                                point.latitude - zone.center.latitude, 2) +
+                            math.pow(
+                                point.longitude - zone.center.longitude, 2));
+                        if (dist < 0.3) {
+                          _isolateZone(zone);
+                          break;
+                        }
+                      }
                     },
-                    textInputAction: TextInputAction.search,
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.raksha',
+                    ),
+                    PolygonLayer(
+                      polygons: _visibleZones.map((zone) {
+                        final double opacity = _isFocusedMode ? 0.85 : 0.45;
+                        return Polygon(
+                          points: zone.boundary,
+                          color: zone.baseColor.withOpacity(opacity),
+                          borderColor: zone.borderColor,
+                          borderStrokeWidth: _isFocusedMode ? 3.0 : 1.5,
+                          isFilled: true,
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+
+                // TOP BAR
+                Positioned(
+                  top: padding.top + 10,
+                  left: 16,
+                  right: 16,
+                  child: Column(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 10,
+                                offset: Offset(0, 4))
+                          ],
+                        ),
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            hintText: "Search district...",
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
+                            prefixIcon: Icon(Icons.search, color: Colors.grey),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: Icon(Icons.close, color: Colors.grey),
+                                    onPressed: _resetView,
+                                  )
+                                : null,
+                          ),
+                          onSubmitted: (_) => _performSearch(),
+                          onChanged: (val) {
+                            if (val.isEmpty) setState(() {});
+                          },
+                          textInputAction: TextInputAction.search,
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      if (!_isFocusedMode && _searchController.text.isEmpty)
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _filterChip('Safe', Colors.green),
+                              SizedBox(width: 8),
+                              _filterChip('Moderate', Colors.orange),
+                              SizedBox(width: 8),
+                              _filterChip('Unsafe', Colors.red),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 ),
 
-                SizedBox(height: 10),
+                // NEW "MY LOCATION" BUTTON
+                // Positioned above the bottom panel
+                if (!_isFocusedMode)
+                  Positioned(
+                    bottom: padding.bottom + 100, // Above the legend
+                    right: 16,
+                    child: FloatingActionButton(
+                      onPressed:
+                          _isLocating ? null : _handleFindNearestDistrict,
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.blue.shade900,
+                      child: _isLocating
+                          ? SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : Icon(Icons.my_location),
+                    ),
+                  ),
 
-                if (!_isFocusedMode && _searchController.text.isEmpty)
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
+                // BOTTOM BAR (Legend & Stats)
+                if (!_isFocusedMode)
+                  Positioned(
+                    bottom: padding.bottom + 20,
+                    left: 16,
+                    right: 16,
                     child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        _filterChip('Safe', Colors.green),
-                        SizedBox(width: 8),
-                        _filterChip('Moderate', Colors.orange),
-                        SizedBox(width: 8),
-                        _filterChip('Unsafe', Colors.red),
+                        Container(
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.95),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(blurRadius: 8, color: Colors.black12)
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('Safety Levels',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                      color: Colors.grey[700])),
+                              SizedBox(height: 6),
+                              _legendItem(Colors.green, 'Safe'),
+                              _legendItem(Colors.orange, 'Moderate'),
+                              _legendItem(Colors.red, 'Unsafe'),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade800,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                  blurRadius: 8,
+                                  color: Colors.blue.withOpacity(0.3))
+                            ],
+                          ),
+                          child: Text(
+                            '${_visibleZones.length} Zones',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13),
+                          ),
+                        ),
                       ],
+                    ),
+                  ),
+
+                // BACK TO MAP Button
+                if (_isFocusedMode)
+                  Positioned(
+                    bottom: padding.bottom + 20,
+                    right: 16,
+                    left: 16,
+                    child: ElevatedButton.icon(
+                      onPressed: _resetView,
+                      icon: Icon(Icons.map),
+                      label: Text("Show All Districts"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.blue.shade900,
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        elevation: 4,
+                      ),
                     ),
                   ),
               ],
             ),
-          ),
-
-          // NEW "MY LOCATION" BUTTON
-          // Positioned above the bottom panel
-          if (!_isFocusedMode)
-            Positioned(
-              bottom: padding.bottom + 100, // Above the legend
-              right: 16,
-              child: FloatingActionButton(
-                onPressed: _isLocating ? null : _handleFindNearestDistrict,
-                backgroundColor: Colors.white,
-                foregroundColor: Colors.blue.shade900,
-                child: _isLocating
-                    ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Icon(Icons.my_location),
-              ),
-            ),
-
-          // BOTTOM BAR (Legend & Stats)
-          if (!_isFocusedMode)
-            Positioned(
-              bottom: padding.bottom + 20,
-              left: 16,
-              right: 16,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.95),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [BoxShadow(blurRadius: 8, color: Colors.black12)],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('Safety Levels', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.grey[700])),
-                        SizedBox(height: 6),
-                        _legendItem(Colors.green, 'Safe'),
-                        _legendItem(Colors.orange, 'Moderate'),
-                        _legendItem(Colors.red, 'Unsafe'),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade800,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [BoxShadow(blurRadius: 8, color: Colors.blue.withOpacity(0.3))],
-                    ),
-                    child: Text(
-                      '${_visibleZones.length} Zones',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          // BACK TO MAP Button
-          if (_isFocusedMode)
-            Positioned(
-              bottom: padding.bottom + 20,
-              right: 16,
-              left: 16,
-              child: ElevatedButton.icon(
-                onPressed: _resetView,
-                icon: Icon(Icons.map),
-                label: Text("Show All Districts"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.blue.shade900,
-                  padding: EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 4,
-                ),
-              ),
-            ),
-        ],
-      ),
     );
   }
 
@@ -631,9 +674,13 @@ class _MapPageState extends State<MapPage> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
           SizedBox(width: 6),
-          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
+          Text(label,
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -651,11 +698,12 @@ class _MapPageState extends State<MapPage> {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: isSelected ? color : Colors.grey.shade300),
         ),
-        child: Text(label, style: TextStyle(
-          color: isSelected ? Colors.white : Colors.grey[700],
-          fontWeight: FontWeight.bold,
-          fontSize: 12,
-        )),
+        child: Text(label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.grey[700],
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            )),
       ),
     );
   }
