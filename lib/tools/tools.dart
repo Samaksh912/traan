@@ -1,3 +1,6 @@
+import 'safety_pages.dart';
+import 'self_defense.dart';
+import 'emergency_contacts.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../pages/newsmodel.dart';
@@ -14,6 +17,7 @@ class ToolsPage extends StatefulWidget {
 class _ToolsPageState extends State<ToolsPage> {
   late Future<List<NewsModel>> crimeNews;
   late PageController _pageController;
+  late Timer _timer;
   int _currentIndex = 0;
 
   @override
@@ -23,7 +27,8 @@ class _ToolsPageState extends State<ToolsPage> {
     _pageController = PageController();
 
     // Set a timer to automatically scroll every 5 seconds
-    Timer.periodic(Duration(seconds: 5), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!_pageController.hasClients) return;
       if (_currentIndex < 4) {
         _currentIndex++;
       } else {
@@ -39,9 +44,17 @@ class _ToolsPageState extends State<ToolsPage> {
   }
 
   @override
+  void dispose() {
+    _timer.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SingleChildScrollView(  // Ensure the whole screen can be scrolled
+      body: SingleChildScrollView(
+        // Ensure the whole screen can be scrolled
         child: Column(
           children: [
             Padding(
@@ -56,7 +69,7 @@ class _ToolsPageState extends State<ToolsPage> {
                   } else if (snapshot.hasData) {
                     final newsList = snapshot.data!;
                     return SizedBox(
-                      height: 300,  // Set fixed height for the swipeable area
+                      height: 300, // Set fixed height for the swipeable area
                       child: PageView.builder(
                         controller: _pageController,
                         itemCount: newsList.length,
@@ -86,7 +99,8 @@ class _ToolsPageState extends State<ToolsPage> {
                                         height: 80,
                                         width: 480,
                                         fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) {
+                                        errorBuilder:
+                                            (context, error, stackTrace) {
                                           // Provide a fallback image if the network image fails to load
                                           return Image.asset(
                                             'assets/images/default_image.png',
@@ -100,7 +114,8 @@ class _ToolsPageState extends State<ToolsPage> {
                                   Padding(
                                     padding: const EdgeInsets.all(16.0),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           news.title,
@@ -129,38 +144,78 @@ class _ToolsPageState extends State<ToolsPage> {
                       ),
                     );
                   } else {
-                    return const Center(child: Text('No crime-related news available.'));
+                    return const Center(
+                        child: Text('No crime-related news available.'));
                   }
                 },
               ),
             ),
             // Four static cards below the news section
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10.0),
-              child: GridView.count(
-                shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: ToolsCard(imageurl: 'assets/images/tips.png', title: "Safety Tips"),
+            // Four static cards below the news section
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: GridView(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(8),
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 220,
                   ),
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: ToolsCard(imageurl: 'assets/images/tool.png', title: "Defense Tools"),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: ToolsCard(imageurl: 'assets/images/self1.png', title: "Self Defense"),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: ToolsCard(imageurl: 'assets/images/alert.png', title: "Emergency"),
-                  ),
-                ],
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: ToolsCard(
+                        imageurl: 'assets/images/tips.png',
+                        title: "Safety Tips",
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const SafetyTipsPage()),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: ToolsCard(
+                        imageurl: 'assets/images/tool.png',
+                        title: "Defense Tools",
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const DefenseToolsPage()),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: ToolsCard(
+                        imageurl: 'assets/images/self1.png',
+                        title: "Self Defense",
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const SelfDefensePage()),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: ToolsCard(
+                        imageurl: 'assets/images/alert.png',
+                        title: "Emergency Contacts",
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const EmergencyContactsPage()),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
+            const SizedBox(height: 90),
           ],
         ),
       ),

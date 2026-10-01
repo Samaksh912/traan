@@ -3,6 +3,8 @@ import 'package:boxicons/boxicons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_phone_direct_caller/flutter_phone_direct_caller.dart';
 import 'package:raksha/models/sos.dart';
+import 'package:raksha/services/contacts_store.dart';
+import 'package:raksha/tools/emergency_contacts.dart';
 import 'package:raksha/pages/profile.dart';
 import 'package:raksha/utils/colors.dart';
 import 'package:raksha/widgets/cards.dart';
@@ -51,7 +53,8 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
+class _HomePageState extends State<HomePage>
+    with SingleTickerProviderStateMixin {
   final ShieldModeState _shieldState = ShieldModeState();
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -106,7 +109,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       center: Alignment.topRight,
                       radius: 1.2,
                       colors: [
-                        const Color(0xFF1565C0).withOpacity(0.07 * (_pulseAnimation.value - 1) * 12.5 + 0.04),
+                        const Color(0xFF1565C0).withOpacity(
+                            0.07 * (_pulseAnimation.value - 1) * 12.5 + 0.04),
                         Colors.transparent,
                       ],
                     ),
@@ -126,11 +130,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         Row(
                           children: [
                             IconButton(
-                              icon: Icon(Icons.person, color: Color(ColorsValue().h5)),
+                              icon: Icon(Icons.person,
+                                  color: Color(ColorsValue().h5)),
                               onPressed: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (context) => const ProfilePage()),
+                                  MaterialPageRoute(
+                                      builder: (context) =>
+                                          const ProfilePage()),
                                 );
                               },
                             ),
@@ -157,36 +164,47 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 400),
                             curve: Curves.easeInOut,
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 8),
                             decoration: BoxDecoration(
-                              color: shieldOn ? const Color(0xFF1565C0) : Colors.grey.shade100,
+                              color: shieldOn
+                                  ? const Color(0xFF1565C0)
+                                  : Colors.grey.shade100,
                               borderRadius: BorderRadius.circular(30),
                               border: Border.all(
-                                color: shieldOn ? const Color(0xFF1565C0) : Colors.grey.shade300,
+                                color: shieldOn
+                                    ? const Color(0xFF1565C0)
+                                    : Colors.grey.shade300,
                                 width: 1.5,
                               ),
                               boxShadow: shieldOn
                                   ? [
-                                BoxShadow(
-                                  color: const Color(0xFF1565C0).withOpacity(0.35),
-                                  blurRadius: 12,
-                                  spreadRadius: 1,
-                                  offset: const Offset(0, 4),
-                                )
-                              ]
+                                      BoxShadow(
+                                        color: const Color(0xFF1565C0)
+                                            .withOpacity(0.35),
+                                        blurRadius: 12,
+                                        spreadRadius: 1,
+                                        offset: const Offset(0, 4),
+                                      )
+                                    ]
                                   : [],
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 AnimatedBuilder(
-                                  animation: shieldOn ? _pulseAnimation : const AlwaysStoppedAnimation(1.0),
+                                  animation: shieldOn
+                                      ? _pulseAnimation
+                                      : const AlwaysStoppedAnimation(1.0),
                                   builder: (context, child) => Transform.scale(
-                                    scale: shieldOn ? _pulseAnimation.value : 1.0,
+                                    scale:
+                                        shieldOn ? _pulseAnimation.value : 1.0,
                                     child: Icon(
                                       Icons.shield,
                                       size: 18,
-                                      color: shieldOn ? Colors.white : Colors.grey.shade500,
+                                      color: shieldOn
+                                          ? Colors.white
+                                          : Colors.grey.shade500,
                                     ),
                                   ),
                                 ),
@@ -196,7 +214,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
-                                    color: shieldOn ? Colors.white : Colors.grey.shade600,
+                                    color: shieldOn
+                                        ? Colors.white
+                                        : Colors.grey.shade600,
                                     letterSpacing: 0.3,
                                   ),
                                 ),
@@ -224,42 +244,45 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       curve: Curves.easeInOut,
                       child: shieldOn
                           ? Container(
-                        margin: const EdgeInsets.only(top: 12),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE3F2FD),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF90CAF9), width: 1),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.shield, color: Color(0xFF1565C0), size: 16),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                "Shield Mode is active — ${_activeTrackersSummary()}",
-                                style: const TextStyle(
-                                  color: Color(0xFF1565C0),
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                              margin: const EdgeInsets.only(top: 12),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE3F2FD),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                    color: const Color(0xFF90CAF9), width: 1),
                               ),
-                            ),
-                            GestureDetector(
-                              onTap: _openShieldModeSheet,
-                              child: const Text(
-                                "Edit",
-                                style: TextStyle(
-                                  color: Color(0xFF1565C0),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  decoration: TextDecoration.underline,
-                                ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.shield,
+                                      color: Color(0xFF1565C0), size: 16),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      "Shield Mode is active — ${_activeTrackersSummary()}",
+                                      style: const TextStyle(
+                                        color: Color(0xFF1565C0),
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: _openShieldModeSheet,
+                                    child: const Text(
+                                      "Edit",
+                                      style: TextStyle(
+                                        color: Color(0xFF1565C0),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        ),
-                      )
+                            )
                           : const SizedBox.shrink(),
                     ),
 
@@ -281,35 +304,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       child: ClipOval(
                         child: InkWell(
                           splashColor: Colors.black54,
-                          onTap: () async {
-                            try {
-                              bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-                              if (!serviceEnabled) return;
-
-                              LocationPermission permission = await Geolocator.checkPermission();
-                              if (permission == LocationPermission.denied) {
-                                permission = await Geolocator.requestPermission();
-                                if (permission == LocationPermission.denied) return;
-                              }
-                              if (permission == LocationPermission.deniedForever) return;
-
-                              Position position = await Geolocator.getCurrentPosition(
-                                desiredAccuracy: LocationAccuracy.high,
-                              );
-
-                              String locationUrl =
-                                  "https://maps.google.com/?q=${position.latitude},${position.longitude}";
-                              String message = "Emergency! My current location: $locationUrl";
-                              String phoneNumber = "919627320508";
-                              String whatsappUrl =
-                                  "https://wa.me/$phoneNumber?text=${Uri.encodeComponent(message)}";
-
-                              final Uri uri = Uri.parse(whatsappUrl);
-                              await launchUrl(uri, mode: LaunchMode.externalApplication);
-                            } catch (e) {
-                              debugPrint("Error sharing location: $e");
-                            }
-                          },
+                          onTap: _triggerSos,
+                          onLongPress: _shareLocationOnWhatsApp,
                           child: Ink.image(
                             image: const AssetImage('assets/images/sos.png'),
                             height: 205,
@@ -334,7 +330,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         InkWell(
-                          onTap: () => _callNumber("7058384971"),
+                          onTap: () => _callNumber("100"),
                           child: HelpLineCards(
                             title: "Police 100",
                             assetImg: "assets/images/pol.png",
@@ -342,7 +338,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           ),
                         ),
                         InkWell(
-                          onTap: () => _callNumber("9307227317"),
+                          onTap: _showWomenHelplines,
                           child: HelpLineCards(
                             title: "Women Helpline",
                             assetImg: "assets/images/contact.png",
@@ -370,8 +366,107 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     return "${active.join(', ')} tracking";
   }
 
-  _callNumber(String number) async {
-    await FlutterPhoneDirectCaller.callNumber(number);
+  Future<void> _callNumber(String number) async {
+    try {
+      final ok = await FlutterPhoneDirectCaller.callNumber(number);
+      debugPrint('Direct call to $number returned: $ok');
+      if (ok == true) return;
+    } catch (e) {
+      debugPrint('Direct call to $number failed: $e');
+    }
+    // Fallback: open the dialer with the number pre-filled
+    try {
+      final launched = await launchUrl(Uri(scheme: 'tel', path: number));
+      if (launched) return;
+    } catch (e) {
+      debugPrint('Dialer fallback for $number failed: $e');
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not place a call to $number')),
+      );
+    }
+  }
+
+  // ── Women Helpline sheet ──────────────────────────────────────────────────
+  void _showWomenHelplines() {
+    const helplines = [
+      ['NCW 24×7 Women Helpline', '14490'],
+      ['National Women Helpline', '181'],
+      ['Emergency Response (Police, Fire, Medical)', '112'],
+      ['National Child Helpline', '1098'],
+      ['Cyber Crime Helpline', '1930'],
+    ];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white, // your theme makes sheets transparent
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Helplines',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
+            ),
+            for (final h in helplines)
+              ListTile(
+                leading: const Icon(Icons.call, color: Colors.green),
+                title: Text(h[0]),
+                trailing: Text(
+                  h[1],
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _callNumber(h[1]);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── SOS: call the user's primary emergency contact ────────────────────────
+  void _promptAddContact() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Add an emergency contact first')),
+    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const EmergencyContactsPage(onboarding: true),
+      ),
+    );
+  }
+
+  Future<void> _triggerSos() async {
+    final contact = await ContactsStore.primary();
+    if (contact == null) {
+      _promptAddContact();
+      return;
+    }
+    await _callNumber(contact['number']!);
+  }
+
+  // Long-press on SOS: send your location to the primary contact on WhatsApp
+  Future<void> _shareLocationOnWhatsApp() async {
+    final contact = await ContactsStore.primary();
+    if (contact == null) {
+      _promptAddContact();
+      return;
+    }
+    // wa.me needs digits only, with country code
+    var digits = contact['number']!.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length == 10) digits = '91$digits';
   }
 }
 
@@ -402,10 +497,14 @@ class _ShieldModeSheetState extends State<_ShieldModeSheet> {
 
   void _applyAndClose() {
     // Sync state back to shared state object
-    if (_shieldActive != widget.shieldState.shieldActive) widget.shieldState.toggleShield();
-    if (_audio != widget.shieldState.audioEnabled) widget.shieldState.toggleAudio();
-    if (_video != widget.shieldState.videoEnabled) widget.shieldState.toggleVideo();
-    if (_location != widget.shieldState.locationEnabled) widget.shieldState.toggleLocation();
+    if (_shieldActive != widget.shieldState.shieldActive)
+      widget.shieldState.toggleShield();
+    if (_audio != widget.shieldState.audioEnabled)
+      widget.shieldState.toggleAudio();
+    if (_video != widget.shieldState.videoEnabled)
+      widget.shieldState.toggleVideo();
+    if (_location != widget.shieldState.locationEnabled)
+      widget.shieldState.toggleLocation();
     Navigator.pop(context);
   }
 
@@ -437,7 +536,9 @@ class _ShieldModeSheetState extends State<_ShieldModeSheet> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: _shieldActive ? const Color(0xFF1565C0) : Colors.grey.shade200,
+                  color: _shieldActive
+                      ? const Color(0xFF1565C0)
+                      : Colors.grey.shade200,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
@@ -547,7 +648,8 @@ class _ShieldModeSheetState extends State<_ShieldModeSheet> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, color: Color(0xFF1565C0), size: 16),
+                  const Icon(Icons.info_outline,
+                      color: Color(0xFF1565C0), size: 16),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -637,7 +739,8 @@ class _TrackerTile extends StatelessWidget {
               color: value ? iconBg : Colors.grey.shade200,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: value ? iconColor : Colors.grey.shade400, size: 20),
+            child: Icon(icon,
+                color: value ? iconColor : Colors.grey.shade400, size: 20),
           ),
           const SizedBox(width: 14),
           Expanded(

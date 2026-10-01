@@ -76,9 +76,15 @@ class HelpLineCards extends StatelessWidget {
 }
 
 class ToolsCard extends StatelessWidget {
-  String title;
-  String imageurl;
-  ToolsCard({super.key, required this.title, required this.imageurl});
+  final String title;
+  final String imageurl;
+  final VoidCallback? onTap;
+  const ToolsCard({
+    super.key,
+    required this.title,
+    required this.imageurl,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -88,18 +94,19 @@ class ToolsCard extends StatelessWidget {
       child: Card(
         color: Colors.white,
         elevation: 5,
-        //shape: RoundedRectangleBorder(borderRadius:BorderRadius.circular(40)),
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              Image.asset(
-                imageurl,
-                height: 60,
-              ),
-              SizedBox(height: 10),
-              Text(title, style: TextStyle(fontSize: 16)),
-            ],
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(imageurl, height: 60),
+                const SizedBox(height: 10),
+                Text(title, style: const TextStyle(fontSize: 16)),
+              ],
+            ),
           ),
         ),
       ),

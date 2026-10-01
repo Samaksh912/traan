@@ -2,6 +2,8 @@ import 'package:boxicons/boxicons.dart';
 import 'package:flutter/material.dart';
 import 'package:raksha/Home/home.dart';
 import 'package:raksha/tools/tools.dart';
+import 'package:raksha/tools/emergency_contacts.dart';
+import 'package:raksha/services/contacts_store.dart';
 import 'package:raksha/utils/colors.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import '../Map/map.dart';
@@ -22,37 +24,56 @@ class _RakshaState extends State<Raksha> {
   var _currentIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (await ContactsStore.shouldPromptFirstTime() && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const EmergencyContactsPage(onboarding: true),
+          ),
+        );
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-        extendBody: true,
-        body: pages[_currentIndex],
-        bottomNavigationBar: CurvedNavigationBar(
-          color: Colors.black87,
-          index: _currentIndex,
-          backgroundColor: Color(ColorsValue().primary),
-          height: 60,
-          items: [
-            Icon(
-              Boxicons.bx_home,
-              color: _currentIndex == 0 ? Color(ColorsValue().secondary) : Colors.grey,
-            ),
-            Icon(
-              Boxicons.bx_map,
-              color: _currentIndex == 1 ? Color(ColorsValue().secondary) : Colors.grey,
-            ),
-            Icon(
-              Boxicons.bx_shield,
-              color: _currentIndex == 2 ? Color(ColorsValue().secondary) : Colors.grey,
-            ),
-          ],
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
-        ),
-
-
+      extendBody: true,
+      body: pages[_currentIndex],
+      bottomNavigationBar: CurvedNavigationBar(
+        color: Colors.black87,
+        index: _currentIndex,
+        backgroundColor: Color(ColorsValue().primary),
+        height: 60,
+        items: [
+          Icon(
+            Boxicons.bx_home,
+            color: _currentIndex == 0
+                ? Color(ColorsValue().secondary)
+                : Colors.grey,
+          ),
+          Icon(
+            Boxicons.bx_map,
+            color: _currentIndex == 1
+                ? Color(ColorsValue().secondary)
+                : Colors.grey,
+          ),
+          Icon(
+            Boxicons.bx_shield,
+            color: _currentIndex == 2
+                ? Color(ColorsValue().secondary)
+                : Colors.grey,
+          ),
+        ],
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+      ),
     );
   }
 }
