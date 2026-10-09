@@ -81,6 +81,7 @@ flutter:
   assets:
     - assets/images/
     - assets/final_safety_scores.csv
+    - assets/india_districts_wgs84.geojson
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

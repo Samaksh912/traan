@@ -1,6 +1,6 @@
-# 🛡️ Raksha — Women Safety App
+# 🛡️ Traan — Women Safety & Empowerment App
 
-> **Raksha** (Sanskrit: रक्षा, *protection*) is a cross-platform mobile application built with Flutter that empowers women with real-time district-level safety insights powered by machine learning, interactive maps, an AI chatbot, and a community forum.
+> **Traan** is a comprehensive cross-platform mobile application built with Flutter that empowers women with real-time district-level safety insights, AI-powered navigation, emergency response features, and community support powered by machine learning and interactive mapping.
 
 ---
 
@@ -12,6 +12,7 @@
 - [Project Structure](#project-structure)
 - [Backend — ML Pipeline](#backend--ml-pipeline)
 - [Frontend — Flutter App](#frontend--flutter-app)
+- [Key Features in Detail](#key-features-in-detail)
 - [Getting Started](#getting-started)
 - [Dataset](#dataset)
 - [Model Performance](#model-performance)
@@ -20,7 +21,7 @@
 
 ## Overview
 
-Raksha combines a Python-based data science backend with a Flutter mobile frontend to deliver district-level women's safety scores across India. Historical crime data (2001–2015) from the National Crime Records Bureau (NCRB) is cleaned, processed, and used to train a **Random Forest classifier** that categorises any district as **Safe**, **Moderate**, or **Unsafe**. The resulting safety scores are bundled into the app and visualised on an interactive map.
+Traan combines a Python-based data science backend with a Flutter mobile frontend to deliver district-level women's safety scores across India, complemented by intelligent navigation features, emergency response capabilities, and community engagement. Historical crime data (2001–2015) from the National Crime Records Bureau (NCRB) is cleaned, processed, and used to train machine learning models that categorise any district as **Safe**, **Moderate**, or **Unsafe**. The resulting safety scores are integrated with real-time location awareness and Google Maps API to provide safety-based route navigation.
 
 ---
 
@@ -29,13 +30,15 @@ Raksha combines a Python-based data science backend with a Flutter mobile fronte
 | Feature | Description |
 |---|---|
 | 🗺️ **Safety Map** | Interactive district-level map with colour-coded safety overlays (Safe / Moderate / Unsafe) |
-| 🤖 **AI Chatbot** | Dialogflow-powered safety assistant for real-time guidance |
-| 📰 **News Feed** | Curated safety-related news for women |
-| 👥 **Community** | Forum for sharing experiences and safety tips |
-| 🆘 **Emergency Call** | One-tap direct calling to emergency contacts |
-| 🔐 **Authentication** | Firebase Auth with Google Sign-In support |
-| 📍 **Geolocation** | Live location awareness for contextual safety information |
-| 🏠 **Home Widget** | Quick-access home screen widget |
+| 🧭 **Safe Route Navigation** | Google Maps-integrated routing that selects safer paths based on district safety scores |
+| 🤖 **AI Chatbot** | Dialogflow-powered safety assistant for real-time guidance and safety advice |
+| 📰 **News Feed** | Curated safety-related news and updates for women |
+| 👥 **Community Forum** | Collaborative space for sharing experiences, safety tips, and support |
+| 🆘 **Emergency SOS** | One-tap emergency contact notifications with location sharing (WhatsApp, Call) |
+| 🔐 **Authentication** | Secure Firebase Auth with Google Sign-In and email/password support |
+| 📍 **Real-time Geolocation** | Live location tracking for contextual safety information and emergency response |
+| 🏠 **Home Widget** | Quick-access home screen widget for instant safety updates |
+| 👤 **User Profiles** | Personalized profiles with customizable emergency contacts |
 
 ---
 
@@ -45,15 +48,18 @@ Raksha combines a Python-based data science backend with a Flutter mobile fronte
 | Layer | Technology |
 |---|---|
 | Framework | Flutter (Dart) — SDK `>=3.0.0 <4.0.0` |
-| Maps | `flutter_map` + `latlong2` |
+| Maps & Navigation | `flutter_map` + `latlong2` + Google Maps API |
 | Authentication | Firebase Auth + Google Sign-In |
 | Chatbot | `dialog_flowtter` (Dialogflow) |
-| Navigation | `curved_navigation_bar` |
-| Fonts | `google_fonts` |
+| Navigation UI | `curved_navigation_bar` |
+| Typography | `google_fonts` |
 | Storage | `shared_preferences`, `path_provider` |
-| Networking | `http`, `url_launcher` |
+| Networking | `http`, `url_launcher`, `webview_flutter` |
 | Data | CSV parsing via `csv` package |
-| Location | `geolocator` |
+| Location Services | `geolocator` |
+| Phone Integration | `flutter_phone_direct_caller` (calling), direct messaging |
+| Home Widget | `home_widget` (home screen widget integration) |
+| Icon Library | `boxicons` (icon set) |
 
 ### Backend (ML Pipeline)
 | Layer | Technology |
@@ -69,32 +75,41 @@ Raksha combines a Python-based data science backend with a Flutter mobile fronte
 ## 📁 Project Structure
 
 ```
-raksha/
+traan/
 ├── lib/                          # Flutter frontend source
 │   ├── main.dart                 # App entry point
 │   ├── firebase_options.dart     # Firebase configuration
 │   ├── Home/                     # Home screen & dashboard
-│   ├── Map/                      # Safety map screen
+│   ├── Map/                      # Safety map screen with Google Maps integration
 │   ├── bot/                      # AI chatbot interface
 │   ├── community/                # Community forum
 │   ├── models/                   # Data models
+│   │   └── sos.dart              # Emergency SOS model
 │   ├── pages/                    # App pages
-│   │   ├── authpage.dart         # Auth gate
+│   │   ├── authpage.dart         # Authentication gate
 │   │   ├── loginpage.dart        # Login screen
 │   │   ├── registerpage.dart     # Registration screen
 │   │   ├── loginorreg.dart       # Login/Register switcher
-│   │   ├── profile.dart          # User profile
-│   │   ├── raksha.dart           # Main scaffold
+│   │   ├── profile.dart          # User profile and settings
+│   │   ├── raksha.dart           # Main app scaffold and routing
 │   │   └── newsmodel.dart        # News data model
 │   ├── services/
-│   │   └── authservice.dart      # Firebase auth service
+│   │   ├── authservice.dart      # Firebase authentication service
+│   │   └── contacts_store.dart   # Emergency contacts management
 │   ├── tools/                    # Utility tools
 │   ├── utils/                    # Helper utilities
+│   │   ├── colors.dart           # App color constants
+│   │   ├── routes.dart           # Route definitions
+│   │   ├── textfield.dart        # Custom text field widget
+│   │   ├── loginbutton.dart      # Custom button widget
+│   │   └── squaretile.dart       # Custom tile widget
 │   └── widgets/                  # Reusable UI widgets
+│       ├── cards.dart            # Card components
+│       └── home_widget_helper.dart # Home screen widget integration
 │
 ├── assets/
 │   ├── images/                   # App images & icons
-│   └── final_safety_scores.csv   # Pre-processed safety scores (ML output)
+│   └── final_safety_scores.csv   # Pre-processed district safety scores (ML output)
 │
 ├── women_crimes (1).ipynb        # 🔬 Backend ML pipeline (Google Colab)
 ├── pubspec.yaml                  # Flutter dependencies
@@ -174,20 +189,43 @@ KNeighborsClassifier(n_neighbors=5)
 ## 📱 Frontend — Flutter App
 
 ### Architecture
-The app follows a feature-based folder structure with dedicated directories for pages, services, widgets, and models.
+The app follows a feature-based modular folder structure with dedicated directories for pages, services, widgets, models, and utilities, promoting code reusability and maintainability.
 
-### Key Screens
+### Key Screens & Functionality
 
-- **Login / Register** — Firebase email+password and Google Sign-In authentication
-- **Home Dashboard** — Safety overview and quick actions
-- **Safety Map** — `flutter_map`-based interactive map with district safety colour coding, powered by `final_safety_scores.csv`
-- **AI Chatbot** — Dialogflow integration via `dialog_flowtter` for conversational safety guidance
-- **Community** — User forum for sharing safety tips and experiences
-- **Profile** — User account management
-- **Emergency** — Direct calling via `flutter_phone_direct_caller`
+- **Authentication** — Secure Firebase email+password and Google Sign-In authentication with account creation and validation
+- **Home Dashboard** — Personalized safety overview with quick-access actions, emergency contacts, and safety summaries
+- **Safety Map** — Interactive map powered by `flutter_map` with district-level safety colour coding based on ML-generated scores from `final_safety_scores.csv`
+- **Safe Route Navigation** — Google Maps API integration for generating routes that prioritize safer districts based on safety scores
+- **AI Chatbot** — Dialogflow-powered conversational assistant providing safety guidance, tips, and emergency advice
+- **Community Forum** — Peer-to-peer platform for sharing safety experiences, tips, and providing mutual support
+- **User Profile** — Account management with customizable emergency contacts and personal preferences
+- **Emergency SOS** — Direct emergency notifications via WhatsApp (with location sharing) and phone calls to pre-configured contacts
+- **Home Widget** — iOS/Android home screen widget for instant access to safety information
 
 ### Navigation
-Bottom navigation using `curved_navigation_bar` for a smooth, modern UX.
+Bottom navigation using `curved_navigation_bar` for intuitive, modern user experience across all app sections.
+
+---
+
+## 🔄 Key Features in Detail
+
+### Safe Route Navigation
+- Integrates Google Maps API to provide real-time routing
+- Analyzes district safety scores along potential routes
+- Prioritizes safer districts when multiple routes are available
+- Displays safety information for selected routes
+
+### Emergency SOS System
+- Quick-access emergency contact management
+- One-tap emergency notifications via multiple channels (WhatsApp with location, direct calling)
+- Real-time location sharing with trusted contacts
+- Customizable emergency contact list
+
+### Community Engagement
+- User forum for sharing safety experiences and advice
+- Crowdsourced safety tips and insights
+- Peer support network for women across India
 
 ---
 
@@ -196,8 +234,9 @@ Bottom navigation using `curved_navigation_bar` for a smooth, modern UX.
 ### Prerequisites
 - Flutter SDK `>=3.0.0`
 - Dart SDK
-- Android Studio / Xcode
-- Firebase project with Auth enabled
+- Android Studio / Xcode (for mobile emulation/deployment)
+- Firebase project with Authentication enabled
+- Google Maps API key (for navigation features)
 
 ### Frontend Setup
 
@@ -208,6 +247,15 @@ cd traan
 
 # Install dependencies
 flutter pub get
+
+# Configure Google Maps API
+# Add your Google Maps API key to:
+# - Android: android/app/src/main/AndroidManifest.xml
+# - iOS: ios/Runner/Info.plist
+
+# Configure Firebase
+# - Add your Google Services JSON (Android)
+# - Add your GoogleService-Info.plist (iOS)
 
 # Run the app
 flutter run
@@ -223,6 +271,7 @@ flutter run
    - `dataset_2015.csv`
 3. Run all cells sequentially
 4. Download `final_safety_scores.csv` and place it in `assets/`
+5. Rebuild the Flutter app to include the updated scores
 
 ---
 
@@ -260,15 +309,59 @@ Safe        [    9        0    209 ]
 
 ## 🤝 Contributing
 
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+We welcome contributions! For major changes, please open an issue first to discuss your proposed changes. Our current focus areas include:
+
+- Enhancing the ML model with more recent crime data
+- Adding new safety features and notifications
+- Improving the community forum with moderation tools
+- Expanding language support
+- Optimizing performance and reducing app size
+
+To contribute:
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ---
 
 ## 📄 License
 
-This project is private and not published to pub.dev.
+This project is **private and proprietary**. It is not published to pub.dev and is developed for educational and social impact purposes.
 
 ---
+
+## 🔧 Troubleshooting
+
+### Google Maps API Not Working
+- Ensure your Google Maps API key is correctly configured in both Android and iOS projects
+- Verify API key has Maps SDK for Android/iOS enabled
+- Check that the package name (Android) and bundle ID (iOS) match your configuration
+
+### Firebase Authentication Issues
+- Verify Firebase project is properly set up in Firebase Console
+- Ensure GoogleService-Info.plist (iOS) and google-services.json (Android) are in place
+- Check that authentication methods are enabled in Firebase Console
+
+### App Crashes on Startup
+- Run `flutter clean && flutter pub get` to clear build cache
+- Check device/emulator has sufficient storage
+- Review logs with `flutter logs`
+
+### Maps Not Displaying District Safety Scores
+- Verify `final_safety_scores.csv` exists in `assets/` folder
+- Rebuild app with `flutter clean && flutter run`
+- Check that CSV formatting matches the expected ML pipeline output
+
+---
+
+## 🙏 Acknowledgments
+
+- **National Crime Records Bureau (NCRB)** for providing the crime statistics dataset
+- **Flutter & Firebase communities** for the excellent documentation and support
+- **Dialogflow** for the conversational AI capabilities
+- All contributors and users who help improve Traan
 
 <div align="center">
   <b>Built with ❤️ to help keep women safe across India.</b>

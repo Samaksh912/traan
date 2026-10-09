@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -14,7 +16,108 @@ import 'package:url_launcher/url_launcher.dart';
 const double _maxDetour = 3.0;
 
 const String _kGoogleKey = String.fromEnvironment('GMAPS_KEY',
-    defaultValue: '');
+    defaultValue: 'AIzaSyAEfseDw3PLdlu7JDTrDb5L58tr7wUJozA');
+
+// One exterior polygon ring plus any interior rings (holes).
+class ZoneBoundaryPart {
+  final List<LatLng> points;
+  final List<List<LatLng>> holes;
+
+  const ZoneBoundaryPart({required this.points, this.holes = const []});
+}
+
+// Parses the large boundary asset in a background isolate on mobile/desktop.
+// Keep this function top-level so Flutter's compute() can invoke it.
+const Map<String, String> _boundaryDistrictAliases = {
+  'BENGALURU CITY': 'BANGALORE URBAN',
+  'BENGALURU URBAN': 'BANGALORE URBAN',
+  'BANGALORE CITY': 'BANGALORE URBAN',
+  'BANGALORE COMMR.': 'BANGALORE URBAN',
+  'BENGALURU RURAL': 'BANGALORE RURAL',
+  'MYSURU': 'MYSORE',
+  'MYSORE CITY': 'MYSORE',
+  'HYDERABAD': 'HYDERABAD CITY',
+  'CYBERABAD': 'RANGA REDDY',
+  'COCHIN': 'KOCHI',
+  'COCHIN CITY': 'KOCHI',
+  'KOCHI CITY': 'KOCHI',
+  'KOLKATA CITY': 'KOLKATA',
+  'HOWRAH CITY': 'HOWRAH',
+};
+
+String _normalizeBoundaryName(dynamic value) => value == null
+    ? ''
+    : value.toString().toUpperCase().trim()
+        .replaceAll(' UT', '')
+        .replaceAll(' (UT)', '')
+        .replaceAll('&', 'AND');
+
+String _backgroundBoundaryKey(dynamic state, dynamic district) {
+  var stateName = _normalizeBoundaryName(state);
+  final districtName = _normalizeBoundaryName(district);
+  const stateAliases = <String, String>{
+    'ARUNANCHAL PRADESH': 'ARUNACHAL PRADESH',
+    'ORISSA': 'ODISHA',
+    'UTTARANCHAL': 'UTTARAKHAND',
+    'NCT OF DELHI': 'DELHI',
+  };
+  stateName = stateAliases[stateName] ?? stateName;
+  final canonicalDistrict =
+      _boundaryDistrictAliases[districtName] ?? districtName;
+  return '$stateName|$canonicalDistrict';
+}
+
+Map<String, List<ZoneBoundaryPart>> _parseDistrictBoundariesInBackground(
+    String raw) {
+  final collection = jsonDecode(raw) as Map<String, dynamic>;
+  final features = collection['features'] as List<dynamic>? ?? const [];
+  final result = <String, List<ZoneBoundaryPart>>{};
+
+  List<LatLng> readRing(dynamic rawRing) =>
+      (rawRing as List<dynamic>).map<LatLng>((rawPoint) {
+        final point = rawPoint as List<dynamic>;
+        return LatLng(
+          (point[1] as num).toDouble(),
+          (point[0] as num).toDouble(),
+        );
+      }).toList(growable: false);
+
+  for (final item in features) {
+    final feature = Map<String, dynamic>.from(item as Map);
+    final properties =
+        Map<String, dynamic>.from(feature['properties'] as Map? ?? const {});
+    final geometry =
+        Map<String, dynamic>.from(feature['geometry'] as Map? ?? const {});
+    final key = _backgroundBoundaryKey(
+      properties['state_name']?.toString() ?? '',
+      properties['district']?.toString() ?? '',
+    );
+    final type = geometry['type']?.toString();
+    final coordinates = geometry['coordinates'] as List<dynamic>?;
+    if (coordinates == null) continue;
+
+    final List<dynamic> polygons;
+    if (type == 'Polygon') {
+      polygons = [coordinates];
+    } else if (type == 'MultiPolygon') {
+      polygons = coordinates;
+    } else {
+      continue;
+    }
+
+    final parts = <ZoneBoundaryPart>[];
+    for (final rawPolygon in polygons) {
+      final rings = rawPolygon as List<dynamic>;
+      if (rings.isEmpty) continue;
+      final outer = readRing(rings.first);
+      if (outer.length < 3) continue;
+      final holes = rings.skip(1).map(readRing).toList(growable: false);
+      parts.add(ZoneBoundaryPart(points: outer, holes: holes));
+    }
+    if (parts.isNotEmpty) result[key] = parts;
+  }
+  return result;
+}
 
 // Data Model
 class SafetyZone {
@@ -25,7 +128,7 @@ class SafetyZone {
   final double totalCrimes;
   final double safetyScore;
   final LatLng center;
-  final List<LatLng> boundary;
+  final List<ZoneBoundaryPart> boundaries;
 
   SafetyZone({
     required this.name,
@@ -35,7 +138,7 @@ class SafetyZone {
     required this.totalCrimes,
     required this.safetyScore,
     required this.center,
-    required this.boundary,
+    required this.boundaries,
   });
 
   Color get baseColor {
@@ -142,6 +245,11 @@ class _MapPageState extends State<MapPage> {
         return;
       }
 
+      // Real district geometry, converted to WGS84 longitude/latitude.
+      final geoJsonRaw =
+          await rootBundle.loadString('assets/india_districts_wgs84.geojson');
+      final boundaryLookup = await compute(_parseDistrictBoundariesInBackground, geoJsonRaw);
+
       // Some CSV rows (2014/2015) have a blank State/UT. Learn each district's
       // state from rows that do have one, so those rows can be repaired.
       _stateOfDistrict.clear();
@@ -181,6 +289,7 @@ class _MapPageState extends State<MapPage> {
       }
 
       List<SafetyZone> zones = [];
+      int missingBoundaryCount = 0;
       latestDistrictData.forEach((key, row) {
         String state = _stateFor(row);
         String district = _normalizeName(row[1]);
@@ -194,6 +303,11 @@ class _MapPageState extends State<MapPage> {
           _skippedNoLocation++;
           return;
         }
+
+        final matchingBoundaries =
+            boundaryLookup[_boundaryKey(state, district)] ??
+                const <ZoneBoundaryPart>[];
+        if (matchingBoundaries.isEmpty) missingBoundaryCount++;
 
         String safetyCategory = row[12].toString().trim();
         if (safetyCategory.isNotEmpty) {
@@ -209,7 +323,7 @@ class _MapPageState extends State<MapPage> {
           safetyScore: double.tryParse(row[11].toString()) ?? 0,
           safetyCategory: safetyCategory,
           center: center,
-          boundary: _generateCircularBoundary(center, 0.3),
+          boundaries: matchingBoundaries,
         ));
       });
 
@@ -221,6 +335,7 @@ class _MapPageState extends State<MapPage> {
         _resetView();
         _isLoading = false;
       });
+      print('Districts without matching GeoJSON boundaries: $missingBoundaryCount');
     } catch (e) {
       print('Error: $e');
       setState(() => _isLoading = false);
@@ -287,16 +402,43 @@ class _MapPageState extends State<MapPage> {
     return null;
   }
 
-  List<LatLng> _generateCircularBoundary(LatLng center, double radiusDegrees) {
-    List<LatLng> points = [];
-    const int numberOfPoints = 24;
-    for (int i = 0; i < numberOfPoints; i++) {
-      double angle = (i * 360 / numberOfPoints) * math.pi / 180;
-      double lat = center.latitude + radiusDegrees * math.cos(angle);
-      double lng = center.longitude + radiusDegrees * math.sin(angle);
-      points.add(LatLng(lat, lng));
+  String _boundaryKey(dynamic state, dynamic district) {
+    var stateName = _normalizeName(state);
+    final districtName = _normalizeName(district);
+
+    // Normalize common historic/alternate spellings in the boundary data.
+    const stateAliases = <String, String>{
+      'ARUNANCHAL PRADESH': 'ARUNACHAL PRADESH',
+      'ORISSA': 'ODISHA',
+      'UTTARANCHAL': 'UTTARAKHAND',
+      'NCT OF DELHI': 'DELHI',
+    };
+    stateName = stateAliases[stateName] ?? stateName;
+    final canonicalDistrict = _districtAliases[districtName] ?? districtName;
+    return '$stateName|$canonicalDistrict';
+  }
+
+  bool _pointInRing(LatLng point, List<LatLng> ring) {
+    bool inside = false;
+    for (int i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      final xi = ring[i].longitude;
+      final yi = ring[i].latitude;
+      final xj = ring[j].longitude;
+      final yj = ring[j].latitude;
+      final crosses = (yi > point.latitude) != (yj > point.latitude);
+      if (crosses) {
+        final xAtLatitude =
+            (xj - xi) * (point.latitude - yi) / (yj - yi) + xi;
+        if (point.longitude < xAtLatitude) inside = !inside;
+      }
     }
-    return points;
+    return inside;
+  }
+
+  bool _zoneContainsPoint(SafetyZone zone, LatLng point) {
+    return zone.boundaries.any((part) =>
+        _pointInRing(point, part.points) &&
+        !part.holes.any((hole) => _pointInRing(point, hole)));
   }
 
   // --- LOCATION SERVICES ---
@@ -1315,6 +1457,26 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
+  // Group similar safety styles together so the renderer can batch work.
+  // Boundary point lists are reused; only light Polygon wrappers are created.
+  List<Polygon> _buildZonePolygons() {
+    final renderZones = List<SafetyZone>.from(_visibleZones)
+      ..sort((a, b) => a.safetyCategory.compareTo(b.safetyCategory));
+    final opacity = _isFocusedMode ? 0.34 : 0.20;
+
+    return renderZones.expand((zone) {
+      return zone.boundaries.map((part) => Polygon(
+            points: part.points,
+            holePointsList: part.holes,
+            color: zone.baseColor.withOpacity(opacity),
+            borderColor: zone.borderColor.withOpacity(0.85),
+            // Thin borders reduce expensive stroke rendering on the full map.
+            borderStrokeWidth: _isFocusedMode ? 1.5 : 0.45,
+            isFilled: true,
+          ));
+    }).toList(growable: false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final padding = MediaQuery.of(context).padding;
@@ -1340,12 +1502,8 @@ class _MapPageState extends State<MapPage> {
                         return;
                       }
 
-                      for (var zone in _visibleZones) {
-                        final double dist = math.sqrt(math.pow(
-                                point.latitude - zone.center.latitude, 2) +
-                            math.pow(
-                                point.longitude - zone.center.longitude, 2));
-                        if (dist < 0.3) {
+                      for (final zone in _visibleZones) {
+                        if (_zoneContainsPoint(zone, point)) {
                           _isolateZone(zone);
                           break;
                         }
@@ -1359,17 +1517,9 @@ class _MapPageState extends State<MapPage> {
                       userAgentPackageName: 'com.example.raksha',
                     ),
                     PolygonLayer(
-                      polygons: _visibleZones.map((zone) {
-                        final double opacity =
-                            _isFocusedMode ? 0.85 : 0.45; // transparency
-                        return Polygon(
-                          points: zone.boundary,
-                          color: zone.baseColor.withOpacity(opacity),
-                          borderColor: zone.borderColor,
-                          borderStrokeWidth: _isFocusedMode ? 3.0 : 1.5,
-                          isFilled: true,
-                        );
-                      }).toList(),
+                      // Skip polygons that are completely outside the viewport.
+                      polygonCulling: true,
+                      polygons: _buildZonePolygons(),
                     ),
                     PolylineLayer(
                       polylines: [
