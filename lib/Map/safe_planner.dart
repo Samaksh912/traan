@@ -89,8 +89,9 @@ class SafeCorridorPlanner {
   }
 
   List<int> _nearest(LatLng p, int m) {
-    final d =
-        zones.map((z) => _km2d(p.latitude, p.longitude, z.lat, z.lng)).toList();
+    final d = zones
+        .map((z) => _km2d(p.latitude, p.longitude, z.lat, z.lng))
+        .toList();
     final idx = List<int>.generate(zones.length, (i) => i);
     idx.sort((x, y) => d[x].compareTo(d[y]));
     return idx.take(m).toList();
@@ -153,8 +154,9 @@ class SafeCorridorPlanner {
       path.add(cur);
       cur = prev[cur];
     }
-    final pts =
-        path.reversed.map((i) => LatLng(zones[i].lat, zones[i].lng)).toList();
+    final pts = path.reversed
+        .map((i) => LatLng(zones[i].lat, zones[i].lng))
+        .toList();
 
     // Thin out: keep waypoints far enough apart (and under the API limit).
     double totalKm = 0;
@@ -201,15 +203,31 @@ class SafeRouter {
   /// Short human-readable summary of the last search (shown in the panel).
   String lastReport = '';
 
-  Future<List<RouteOption>> candidates(LatLng from, LatLng to) async {
-    final all = <RouteOption>[...await service.fetchRoutes(from, to)];
+  /// Where Google placed the start / end when they were given as place names
+  /// (null when plain coordinates were used).
+  LatLng? resolvedFrom;
+  LatLng? resolvedTo;
+
+  Future<List<RouteOption>> candidates(LatLng from, LatLng to,
+      {String? fromAddress, String? toAddress}) async {
+    resolvedFrom = null;
+    resolvedTo = null;
+    final all = <RouteOption>[
+      ...await service.fetchRoutes(from, to,
+          fromAddress: fromAddress, toAddress: toAddress)
+    ];
     if (all.isEmpty) return all;
+    // From here on, use where Google actually put the places.
+    resolvedFrom = service.resolvedFrom;
+    resolvedTo = service.resolvedTo;
+    final start = resolvedFrom ?? from;
+    final end = resolvedTo ?? to;
     final report = <String>['${all.length} direct'];
 
     // Skip steered plans that are identical to the plain shortest corridor.
-    final seen = <String>{_sig(planner.corridor(from, to, 0))};
+    final seen = <String>{_sig(planner.corridor(start, end, 0))};
     for (final l in lambdas) {
-      final wps = planner.corridor(from, to, l);
+      final wps = planner.corridor(start, end, l);
       if (wps.isEmpty) {
         report.add('safety $l: no waypoints');
         continue;
@@ -219,7 +237,7 @@ class SafeRouter {
         continue;
       }
       try {
-        final r = await service.fetchVia(from, to, wps);
+        final r = await service.fetchVia(start, end, wps);
         if (r != null) {
           r.via = wps;
           all.add(r);

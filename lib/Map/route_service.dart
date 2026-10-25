@@ -8,10 +8,30 @@ class RouteService {
   final String apiKey;
   String lastSource = 'Google Routes API';
 
+  /// Where Google placed the start / end when they were sent as place names
+  /// (null when plain coordinates were used).
+  LatLng? resolvedFrom;
+  LatLng? resolvedTo;
+
   RouteService(this.apiKey);
 
-  /// Google's own alternatives for A to B.
-  Future<List<RouteOption>> fetchRoutes(LatLng from, LatLng to) {
+  /// Google's own alternatives for A to B. When a place is only known by name
+  /// (its stored coordinates are a placeholder), pass its address and Google
+  /// finds the real spot.
+  Future<List<RouteOption>> fetchRoutes(LatLng from, LatLng to,
+      {String? fromAddress, String? toAddress}) async {
+    resolvedFrom = null;
+    resolvedTo = null;
+    if (fromAddress != null || toAddress != null) {
+      try {
+        return await _fetchGoogle(from, to,
+            fromAddress: fromAddress, toAddress: toAddress);
+      } catch (e) {
+        print('Address lookup failed, using stored coordinates: $e');
+        resolvedFrom = null;
+        resolvedTo = null;
+      }
+    }
     return _fetchGoogle(from, to);
   }
 
@@ -28,8 +48,20 @@ class RouteService {
         }
       };
 
+  LatLng? _latLng(dynamic loc) {
+    try {
+      final m = loc['latLng'];
+      return LatLng((m['latitude'] as num).toDouble(),
+          (m['longitude'] as num).toDouble());
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<List<RouteOption>> _fetchGoogle(LatLng from, LatLng to,
-      {List<LatLng> via = const []}) async {
+      {List<LatLng> via = const [],
+      String? fromAddress,
+      String? toAddress}) async {
     if (apiKey.isEmpty) {
       throw Exception(
           'Google API key missing. Paste it as defaultValue near the top of the map file.');
@@ -42,11 +74,12 @@ class RouteService {
             'Content-Type': 'application/json',
             'X-Goog-Api-Key': apiKey,
             'X-Goog-FieldMask':
-                'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline',
+                'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.legs.startLocation,routes.legs.endLocation',
           },
           body: jsonEncode({
-            'origin': _wp(from),
-            'destination': _wp(to),
+            'origin':
+                fromAddress != null ? {'address': fromAddress} : _wp(from),
+            'destination': toAddress != null ? {'address': toAddress} : _wp(to),
             'travelMode': 'DRIVE',
             // Google does not allow alternatives together with intermediates.
             'computeAlternativeRoutes': via.isEmpty,
@@ -66,6 +99,14 @@ class RouteService {
     }
 
     final routes = (jsonDecode(res.body)['routes'] as List?) ?? [];
+    if (routes.isNotEmpty && (fromAddress != null || toAddress != null)) {
+      final legs = (routes.first['legs'] as List?) ?? [];
+      if (legs.isNotEmpty) {
+        if (fromAddress != null)
+          resolvedFrom = _latLng(legs.first['startLocation']);
+        if (toAddress != null) resolvedTo = _latLng(legs.last['endLocation']);
+      }
+    }
     return routes.map<RouteOption>((r) {
       final secs = double.parse((r['duration'] as String).replaceAll('s', ''));
       final dist = (r['distanceMeters'] as num?)?.toDouble() ?? 0;

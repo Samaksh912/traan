@@ -13,8 +13,12 @@ import 'package:url_launcher/url_launcher.dart';
 // Safest/Moderate may take up to this many times the fastest route's time.
 const double _maxDetour = 3.0;
 
+// Google key for route fetching. Run with:
+//   flutter run --dart-define=GMAPS_KEY=your_key
+// or paste it as defaultValue below (never commit it).
+// Routes come from Google only.
 const String _kGoogleKey = String.fromEnvironment('GMAPS_KEY',
-    defaultValue: '');
+    defaultValue: 'AIzaSyAEfseDw3PLdlu7JDTrDb5L58tr7wUJozA');
 
 // Data Model
 class SafetyZone {
@@ -26,6 +30,8 @@ class SafetyZone {
   final double safetyScore;
   final LatLng center;
   final List<LatLng> boundary;
+  // false when the position is only a placeholder (state centre + offset)
+  final bool exact;
 
   SafetyZone({
     required this.name,
@@ -36,6 +42,7 @@ class SafetyZone {
     required this.safetyScore,
     required this.center,
     required this.boundary,
+    this.exact = true,
   });
 
   Color get baseColor {
@@ -80,6 +87,9 @@ class _MapPageState extends State<MapPage> {
   // Data-quality helpers
   final Map<String, String> _stateOfDistrict = {};
   int _skippedNoLocation = 0;
+  String?
+      _fromAddress; // place name, used while the position is only a placeholder
+  String? _toAddress;
 
   // --- Route planner state ---
   bool _routeMode = true; // directions-first screen
@@ -210,6 +220,7 @@ class _MapPageState extends State<MapPage> {
           safetyCategory: safetyCategory,
           center: center,
           boundary: _generateCircularBoundary(center, 0.3),
+          exact: _hasExactCoordinates(district),
         ));
       });
 
@@ -261,6 +272,19 @@ class _MapPageState extends State<MapPage> {
     'KOLKATA CITY': 'KOLKATA',
     'HOWRAH CITY': 'HOWRAH',
   };
+
+  // True when the district has a real stored position (not a placeholder).
+  bool _hasExactCoordinates(String district) {
+    final alias = _districtAliases[district];
+    if (alias != null && GeoData.districtCoordinates.containsKey(alias)) {
+      return true;
+    }
+    if (GeoData.districtCoordinates.containsKey(district)) return true;
+    for (var key in GeoData.districtCoordinates.keys) {
+      if (district.contains(key) || key.contains(district)) return true;
+    }
+    return false;
+  }
 
   // Returns null when we have no trustworthy position for the district.
   LatLng? _getBestCoordinates(String state, String district) {
@@ -502,6 +526,8 @@ class _MapPageState extends State<MapPage> {
     setState(() {
       _from = null;
       _to = null;
+      _fromAddress = null;
+      _toAddress = null;
       _fromCtrl.clear();
       _toCtrl.clear();
       _suggestions = [];
@@ -509,14 +535,16 @@ class _MapPageState extends State<MapPage> {
     });
   }
 
-  void _setPoint(bool isFrom, LatLng p, String label) {
+  void _setPoint(bool isFrom, LatLng p, String label, {String? address}) {
     setState(() {
       if (isFrom) {
         _from = p;
+        _fromAddress = address;
         _fromCtrl.text = label;
         _activeField = 1;
       } else {
         _to = p;
+        _toAddress = address;
         _toCtrl.text = label;
       }
       _suggestions = [];
@@ -543,8 +571,10 @@ class _MapPageState extends State<MapPage> {
       _activeField = field;
       if (field == 0) {
         _from = null;
+        _fromAddress = null;
       } else {
         _to = null;
+        _toAddress = null;
       }
       _clearRoutes();
       if (q.length < 2) {
@@ -562,9 +592,12 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _selectSuggestion(SafetyZone z) {
-    _setPoint(_activeField == 0, z.center, _placeLabel(z));
+    // Zones whose position is only a placeholder are located by name through
+    // Google when the route is requested.
+    _setPoint(_activeField == 0, z.center, _placeLabel(z),
+        address: z.exact ? null : '${_placeLabel(z)}, India');
     FocusScope.of(context).unfocus();
-    _mapController.move(z.center, 7.0);
+    if (z.exact) _mapController.move(z.center, 7.0);
   }
 
   void _swapPoints() {
@@ -572,6 +605,9 @@ class _MapPageState extends State<MapPage> {
       final tp = _from;
       _from = _to;
       _to = tp;
+      final ta = _fromAddress;
+      _fromAddress = _toAddress;
+      _toAddress = ta;
       final tt = _fromCtrl.text;
       _fromCtrl.text = _toCtrl.text;
       _toCtrl.text = tt;
@@ -590,13 +626,19 @@ class _MapPageState extends State<MapPage> {
         planner: SafeCorridorPlanner(_zoneRisks),
         service: _routeService,
       );
-      final routes = await _safeRouter!.candidates(from, to);
+      final routes = await _safeRouter!.candidates(from, to,
+          fromAddress: _fromAddress, toAddress: _toAddress);
       if (routes.isEmpty) throw 'No route found between these points.';
       final picked = scorer.pick(routes, maxDetour: _maxDetour);
       if (!mounted) return;
       setState(() {
         _routes = routes;
         _picked = picked;
+        // Use the real positions Google found for place names.
+        _from = _safeRouter!.resolvedFrom ?? _from;
+        _to = _safeRouter!.resolvedTo ?? _to;
+        _fromAddress = null;
+        _toAddress = null;
       });
       _fitRoute();
     } catch (e) {
@@ -631,8 +673,17 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
-  // One navigation colour for the selected route (risk colours are separate).
-  Color _modeColor(RouteMode m) => Colors.blue.shade800;
+  // Route colours on the map and in the list.
+  Color _modeColor(RouteMode m) {
+    switch (m) {
+      case RouteMode.safest:
+        return Colors.green.shade600;
+      case RouteMode.moderate:
+        return Colors.amber.shade700;
+      case RouteMode.fastest:
+        return Colors.blue.shade600;
+    }
+  }
 
   String _modeLabel(RouteMode m) {
     switch (m) {
@@ -723,7 +774,7 @@ class _MapPageState extends State<MapPage> {
         prefixIcon: field == 0
             ? Icon(Icons.radio_button_checked,
                 size: 18, color: Colors.blue.shade800)
-            : Icon(Icons.location_on, size: 20, color: Colors.red.shade700),
+            : Icon(Icons.location_on, size: 20, color: Colors.blue.shade800),
         prefixIconConstraints: BoxConstraints(minWidth: 30),
         suffixIcon: field == 0
             ? IconButton(
@@ -757,16 +808,16 @@ class _MapPageState extends State<MapPage> {
       children: [
         Expanded(
           child: Text(
-            missing ? 'Search or tap the map' : 'Zone risk',
+            missing ? 'Search or tap the map' : 'Zone safety',
             overflow: TextOverflow.ellipsis,
             style: TextStyle(fontSize: 11.5, color: Colors.grey[700]),
           ),
         ),
-        _legendDot(Colors.green, 'Low'),
+        _legendDot(Colors.green, 'Safe'),
         SizedBox(width: 10),
         _legendDot(Colors.orange, 'Moderate'),
         SizedBox(width: 10),
-        _legendDot(Colors.red, 'High'),
+        _legendDot(Colors.red, 'Less safe'),
       ],
     );
   }
@@ -861,23 +912,21 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
-  // ---- risk wording: always colour + text, never colour alone ----
-  String _riskWord(double safety) {
-    if (safety >= 75) return 'Low risk';
-    if (safety >= 50) return 'Moderate risk';
-    return 'High risk';
+  // ---- safety wording: higher score = safer ----
+  String _safetyWord(double s) {
+    if (s >= 80) return 'Very safe';
+    if (s >= 65) return 'Safe';
+    if (s >= 50) return 'Fairly safe';
+    return 'Take extra care';
   }
 
-  Color _riskColor(double safety) {
-    if (safety >= 75) return Colors.green.shade700;
-    if (safety >= 50) return Colors.orange.shade800;
-    return Colors.red.shade700;
-  }
+  Color _safetyColor(double s) =>
+      s >= 65 ? Colors.green.shade700 : Colors.orange.shade800;
 
   String _routeHint(RouteMode m) {
     switch (m) {
       case RouteMode.safest:
-        return 'Lowest-risk route available';
+        return 'Highest safety score available';
       case RouteMode.moderate:
         return 'Balance of safety and travel time';
       case RouteMode.fastest:
@@ -885,35 +934,100 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
-  Widget _routeRow(RouteMode m) {
-    final r = _picked[m];
-    final selected = _selectedMode == m;
-    final riskColor = r == null ? Colors.grey : _riskColor(r.safety);
+  // Modes that ended up on the very same route are shown as one row.
+  List<List<RouteMode>> _routeGroups() {
+    if (_picked.isEmpty) {
+      return RouteMode.values.map((m) => [m]).toList();
+    }
+    final groups = <List<RouteMode>>[];
+    for (final m in RouteMode.values) {
+      final r = _picked[m];
+      if (r == null) continue;
+      final existing =
+          groups.where((g) => identical(_picked[g.first], r)).toList();
+      if (existing.isNotEmpty) {
+        existing.first.add(m);
+      } else {
+        groups.add([m]);
+      }
+    }
+    return groups;
+  }
+
+  String _groupLabel(List<RouteMode> g) {
+    if (g.length == 3) return 'Safest & Fastest';
+    return g.map(_modeLabel).join(' & ');
+  }
+
+  Color _routeColor(RouteOption r) {
+    for (final m in RouteMode.values) {
+      if (identical(_picked[m], r)) return _modeColor(m);
+    }
+    return _modeColor(RouteMode.fastest);
+  }
+
+  // All distinct routes on the map; the selected one is drawn last (on top).
+  List<Polyline> _routeLines() {
+    final sel = _picked[_selectedMode];
+    final routes = _picked.values.toSet().toList();
+    routes.sort(
+        (a, b) => (identical(a, sel) ? 1 : 0) - (identical(b, sel) ? 1 : 0));
+    final out = <Polyline>[];
+    for (final r in routes) {
+      final selected = identical(r, sel);
+      final color = _routeColor(r);
+      out.add(Polyline(
+        points: r.points,
+        strokeWidth: selected ? 10 : 7,
+        color: Colors.white,
+      ));
+      out.add(Polyline(
+        points: r.points,
+        strokeWidth: selected ? 6 : 4.5,
+        color: selected ? color : color.withOpacity(0.8),
+      ));
+    }
+    return out;
+  }
+
+  Widget _routeRow(List<RouteMode> group) {
+    final first = group.first;
+    final r = _picked[first];
+    final selected = group.contains(_selectedMode);
+    final color = _modeColor(first);
+    final scoreColor = r == null ? Colors.grey : _safetyColor(r.safety);
     return InkWell(
-      onTap: () => _selectMode(m),
+      onTap: () => _selectMode(first),
       borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? Colors.blue.shade50 : Colors.white,
+          color: selected ? color.withOpacity(0.10) : Colors.white,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-              color: selected ? Colors.blue.shade700 : Colors.grey.shade300,
+              color: selected ? color : Colors.grey.shade300,
               width: selected ? 1.5 : 1),
         ),
         child: Row(
           children: [
+            Container(
+              width: 4,
+              height: 36,
+              decoration: BoxDecoration(
+                  color: color, borderRadius: BorderRadius.circular(2)),
+            ),
+            SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_modeLabel(m),
+                  Text(_groupLabel(group),
                       style: TextStyle(
                           fontSize: 14.5, fontWeight: FontWeight.w600)),
                   SizedBox(height: 2),
                   Text(
                     r == null
-                        ? _routeHint(m)
+                        ? _routeHint(first)
                         : '${_fmtDuration(r.durationSeconds)} · ${_fmtKm(r.distanceMeters)} km',
                     style: TextStyle(fontSize: 12.5, color: Colors.grey[700]),
                   ),
@@ -932,17 +1046,17 @@ class _MapPageState extends State<MapPage> {
                           style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
-                              color: riskColor)),
+                              color: scoreColor)),
                       Text('/100',
                           style:
                               TextStyle(fontSize: 11, color: Colors.grey[600])),
                     ],
                   ),
-                  Text(_riskWord(r.safety),
+                  Text(_safetyWord(r.safety),
                       style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w500,
-                          color: riskColor)),
+                          color: scoreColor)),
                 ],
               ),
           ],
@@ -976,18 +1090,26 @@ class _MapPageState extends State<MapPage> {
   // Only facts that come from the route's own data.
   List<Widget> _detailLines(RouteOption sel) {
     final fast = _picked[RouteMode.fastest];
-    final nonFast = fast != null && !identical(sel, fast);
     final lines = <Widget>[];
-    if (nonFast) {
-      final f = fast!;
-      final avoided = f.highRiskAreas - sel.highRiskAreas;
-      final extra = sel.durationSeconds - f.durationSeconds;
+    if (fast == null) return lines;
+    final isFast = identical(sel, fast);
+    final isSafest = identical(_picked[RouteMode.safest], sel);
+
+    if (isFast && isSafest) {
+      lines.add(_detailLine(Icons.verified_outlined, Colors.green.shade700,
+          'The quickest route is also the safest we found'));
+    } else if (isFast) {
+      lines.add(_detailLine(
+          Icons.schedule, Colors.grey.shade700, 'Shortest travel time'));
+    } else {
+      final avoided = fast.highRiskAreas - sel.highRiskAreas;
+      final extra = sel.durationSeconds - fast.durationSeconds;
       if (avoided > 0) {
         lines.add(_detailLine(Icons.check_circle, Colors.green.shade700,
-            'Avoids $avoided high-risk ${_areas(avoided)}'));
-      } else if (sel.safety > f.safety + 1) {
+            'Avoids $avoided less-safe ${_areas(avoided)}'));
+      } else if (sel.safety > fast.safety + 1) {
         lines.add(_detailLine(Icons.check_circle, Colors.green.shade700,
-            'More of the route in lower-risk zones'));
+            'More of the route in safer zones'));
       }
       lines.add(_detailLine(
           Icons.schedule,
@@ -995,19 +1117,14 @@ class _MapPageState extends State<MapPage> {
           extra > 60
               ? '+${_fmtDuration(extra)} compared with the fastest route'
               : 'About the same travel time as the fastest route'));
-    } else if (_selectedMode != RouteMode.fastest) {
-      lines.add(_detailLine(Icons.info_outline, Colors.grey.shade700,
-          'No lower-risk route found for this trip'));
-    } else {
-      lines.add(_detailLine(
-          Icons.schedule, Colors.grey.shade700, 'Shortest travel time'));
     }
+
     if (sel.highRiskAreas > 0) {
-      lines.add(_detailLine(Icons.warning_amber_rounded, Colors.red.shade700,
-          'Passes through ${sel.highRiskAreas} high-risk ${_areas(sel.highRiskAreas)}'));
+      lines.add(_detailLine(Icons.info_outline, Colors.orange.shade800,
+          'Passes through ${sel.highRiskAreas} less-safe ${_areas(sel.highRiskAreas)}'));
     } else {
       lines.add(_detailLine(Icons.check_circle_outline, Colors.green.shade700,
-          'No high-risk areas on this route'));
+          'Stays clear of less-safe areas'));
     }
     return lines;
   }
@@ -1031,11 +1148,11 @@ class _MapPageState extends State<MapPage> {
       final avoided = f.highRiskAreas - sel.highRiskAreas;
       if (avoided > 0) {
         reasons.add(
-            'Avoids $avoided high-risk ${_areas(avoided)}. The fastest route passes through ${f.highRiskAreas}, this one passes through ${sel.highRiskAreas}.');
+            'Avoids $avoided less-safe ${_areas(avoided)}. The fastest route passes through ${f.highRiskAreas}, this one passes through ${sel.highRiskAreas}.');
       }
       if (sel.lowShare - f.lowShare >= 0.02) {
         reasons.add(
-            'More of the route is in lower-risk zones: ${(sel.lowShare * 100).round()}% compared with ${(f.lowShare * 100).round()}% on the fastest route.');
+            'More of the route is in safer zones: ${(sel.lowShare * 100).round()}% compared with ${(f.lowShare * 100).round()}% on the fastest route.');
       }
       if (f.risk - sel.risk >= 0.01) {
         reasons.add(
@@ -1083,12 +1200,12 @@ class _MapPageState extends State<MapPage> {
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               SizedBox(height: 4),
               Text(
-                'Each stretch of the route is rated by the zone it passes through: low risk counts fully, moderate risk counts half and high risk counts zero. The score is the average, out of 100.',
+                'Each stretch of the route is rated by the zone it passes through: safe zones count fully, moderate zones count half and less-safe zones count zero. The score is the average, out of 100. Higher is safer.',
                 style: TextStyle(fontSize: 13, color: Colors.grey[800]),
               ),
               SizedBox(height: 10),
               Text(
-                'This is a risk estimate based on reported district-level crime data (crimes against women). It is not a guarantee of personal safety.',
+                'This is a safety estimate based on reported district-level crime data (crimes against women). It is not a guarantee of personal safety.',
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             ],
@@ -1145,10 +1262,10 @@ class _MapPageState extends State<MapPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final m in RouteMode.values)
+                  for (final g in _routeGroups())
                     Padding(
                       padding: EdgeInsets.only(bottom: 6),
-                      child: _routeRow(m),
+                      child: _routeRow(g),
                     ),
                   if (sel != null)
                     Padding(
@@ -1372,38 +1489,18 @@ class _MapPageState extends State<MapPage> {
                       }).toList(),
                     ),
                     PolylineLayer(
-                      polylines: [
-                        for (final r in _picked.values.toSet())
-                          if (!identical(r, _picked[_selectedMode]))
-                            Polyline(
-                              points: r.points,
-                              strokeWidth: 5,
-                              color: Colors.grey.shade600.withOpacity(0.75),
-                            ),
-                        if (_picked[_selectedMode] != null) ...[
-                          Polyline(
-                            points: _picked[_selectedMode]!.points,
-                            strokeWidth: 9,
-                            color: Colors.blue.shade900,
-                          ),
-                          Polyline(
-                            points: _picked[_selectedMode]!.points,
-                            strokeWidth: 5.5,
-                            color: Colors.blue.shade500,
-                          ),
-                        ],
-                      ],
+                      polylines: _routeLines(),
                     ),
                     MarkerLayer(
                       markers: [
-                        if (_from != null)
+                        if (_from != null && _fromAddress == null)
                           Marker(
                             point: _from!,
                             width: 22,
                             height: 22,
                             builder: (_) => _pinDot(Colors.blue.shade800),
                           ),
-                        if (_to != null)
+                        if (_to != null && _toAddress == null)
                           Marker(
                             point: _to!,
                             width: 40,
@@ -1411,7 +1508,7 @@ class _MapPageState extends State<MapPage> {
                             builder: (_) => Transform.translate(
                               offset: Offset(0, -17),
                               child: Icon(Icons.location_on,
-                                  size: 40, color: Colors.red.shade700),
+                                  size: 40, color: Colors.blue.shade800),
                             ),
                           ),
                       ],
